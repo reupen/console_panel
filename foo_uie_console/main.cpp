@@ -13,12 +13,12 @@
 * - That's about it ?
 */
 
-#include "../SDK/foobar2000.h"
-#include "../helpers/helpers.h"
+#include "../common/foobar2000/SDK/foobar2000.h"
+#include "../common/foobar2000/helpers/helpers.h"
 #include <commctrl.h>
 #include <windowsx.h>
 
-#include "../columns_ui-sdk/ui_extension.h"
+#include "../common/columns_ui-sdk/ui_extension.h"
 
 /** Declare some component information */
 DECLARE_COMPONENT_VERSION("Console panel",
