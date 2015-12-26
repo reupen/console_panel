@@ -1,5 +1,5 @@
 [submodule "common"]
-	path = common
+	path = foobar2000
 	url = https://github.com/msquared2/foobar2000-common
 [submodule "columns_ui-sdk"]
 	path = columns_ui-sdk
