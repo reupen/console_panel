@@ -22,7 +22,7 @@
 
 /** Declare some component information */
 DECLARE_COMPONENT_VERSION("Console panel",
-"0.4",
+"0.5",
 "compiled: " __DATE__ "\n"
 "with Panel API version: " UI_EXTENSION_VERSION
 
@@ -415,7 +415,7 @@ LRESULT console_window::on_hook(HWND wnd,UINT msg,WPARAM wp,LPARAM lp)
 	case WM_KEYDOWN:
 		/**
 		* It's possible to assign right, left, up and down keys to keyboard shortcuts. But we would rather 
-		* let the edit control proces those.
+		* let the edit control process those.
 		*/
 		if (get_host()->get_keyboard_shortcuts_enabled() && wp != VK_LEFT && wp != VK_RIGHT && wp != VK_UP && wp != VK_DOWN && g_process_keydown_keyboard_shortcuts(wp)) 
 		{
@@ -509,28 +509,28 @@ class console_receiver_impl : public console_receiver
 
 service_factory_single_t<console_receiver_impl> g_menu;
 
-	class font_client_console : public cui::fonts::client
+class font_client_console : public cui::fonts::client
+{
+public:
+	virtual const GUID & get_client_guid() const
 	{
-	public:
-		virtual const GUID & get_client_guid() const
-		{
-			return g_guid_console_font;
-		}
-		virtual void get_name (pfc::string_base & p_out) const
-		{
-			p_out = "Console";
-		}
+		return g_guid_console_font;
+	}
+	virtual void get_name (pfc::string_base & p_out) const
+	{
+		p_out = "Console";
+	}
 
-		virtual cui::fonts::font_type_t get_default_font_type() const
-		{
-			return cui::fonts::font_type_labels;
-		}
+	virtual cui::fonts::font_type_t get_default_font_type() const
+	{
+		return cui::fonts::font_type_labels;
+	}
 
-		virtual void on_font_changed() const 
-		{
-			console_window::g_update_all_fonts();
+	virtual void on_font_changed() const 
+	{
+		console_window::g_update_all_fonts();
 			
-		}
-	};
+	}
+};
 
-	font_client_console::factory<font_client_console> g_font_client_console;
+font_client_console::factory<font_client_console> g_font_client_console;
