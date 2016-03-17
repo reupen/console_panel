@@ -17,7 +17,7 @@ install:
 - cmd: git submodule update --init --recursive
 build_script:
 - ps: >-
-    $toolset = If ($Env:PlatformToolset) {"/p:PlatformToolset=" + $Env:PlatformToolset} Else {""}
+    $toolset = If ($Env:PlatformToolset -ne "Default") {"/p:PlatformToolset=" + $Env:PlatformToolset} Else {""}
 
     $command = 'msbuild "vc14/console_panel.sln" /m /verbosity:normal ' + $toolset +' /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"'
 
