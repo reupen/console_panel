@@ -1,0 +1,21 @@
+jobs:
+- job: build
+  displayName: Build
+  strategy:
+    matrix:
+      Debug:
+        configuration: Debug
+      Release:
+        configuration: Release
+  pool:
+    vmImage: windows-2019
+  steps:
+  - checkout: self
+    submodules: recursive
+  - task: VSBuild@1
+    displayName: Build
+    inputs:
+      solution: vc16/console_panel.sln
+      platform: Win32
+      configuration: $(configuration)
+      msbuildArgs: /m
