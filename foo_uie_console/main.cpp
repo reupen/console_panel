@@ -208,7 +208,7 @@ void ConsoleWindow::update_content()
     }
     uSetWindowText(m_wnd_edit, buffer);
     const int len = Edit_GetLineCount(m_wnd_edit);
-    Edit_Scroll(m_wnd_edit, 0, len);
+    Edit_Scroll(m_wnd_edit, len, 0);
     QueryPerformanceCounter(&m_time_last_update);
 }
 
