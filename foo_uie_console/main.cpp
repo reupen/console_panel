@@ -18,6 +18,8 @@
 #include <mutex>
 #include <vector>
 
+#include "../ui_helpers/stdafx.h"
+
 #include "../pfc/pfc.h"
 
 #include <windows.h>
@@ -89,6 +91,7 @@ private:
 
     LRESULT on_message(HWND wnd, UINT msg, WPARAM wp, LPARAM lp) override;
     LRESULT on_hook(HWND wnd, UINT msg, WPARAM wp, LPARAM lp);
+    void copy() const;
 
     static std::mutex s_mutex;
     static HFONT s_font;
@@ -180,6 +183,22 @@ void ConsoleWindow::s_on_message_received(const char* ptr, t_size len)
     /** Post a notification to all instances of the panel to update their display */
     for (auto&& wnd : s_notify_list) {
         PostMessage(wnd, MSG_UPDATE, 0, 0);
+    }
+}
+
+void ConsoleWindow::copy() const
+{
+    DWORD start{};
+    DWORD end{};
+    SendMessage(m_wnd_edit, EM_GETSEL, reinterpret_cast<WPARAM>(&start), reinterpret_cast<LPARAM>(&end));
+
+    const auto has_selection = start != end;
+
+    if (has_selection) {
+        SendMessage(m_wnd_edit, WM_COPY, NULL, NULL);
+    } else {
+        const auto text = uGetWindowText(m_wnd_edit);
+        uih::set_clipboard_text(text.get_ptr());
     }
 }
 
@@ -353,24 +372,21 @@ LRESULT ConsoleWindow::on_hook(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
                 pt.y = rc.top + (rc.bottom - rc.top) / 2;
             }
 
-            const HMENU menu = CreatePopupMenu();
-            DWORD start = 0;
-            DWORD end = 0;
-            SendMessage(wnd, EM_GETSEL, reinterpret_cast<WPARAM>(&start), reinterpret_cast<LPARAM>(&end));
-            AppendMenu(menu, MF_STRING | (start != end ? NULL : MF_DISABLED), ID_COPY, L"&Copy");
-            AppendMenu(menu, MF_SEPARATOR, NULL, nullptr);
-            AppendMenu(menu, MF_STRING, ID_CLEAR, L"C&lear");
+            uih::Menu menu;
 
-            const int cmd
-                = TrackPopupMenu(menu, TPM_RIGHTBUTTON | TPM_NONOTIFY | TPM_RETURNCMD, pt.x, pt.y, 0, wnd, nullptr);
+            menu.append_command(L"&Copy", ID_COPY);
+            menu.append_separator();
+            menu.append_command(L"&Clear", ID_CLEAR);
 
-            DestroyMenu(menu);
+            const int cmd = menu.run(wnd, pt);
 
-            if (cmd) {
-                if (cmd == ID_COPY)
-                    SendMessage(wnd, WM_COPY, NULL, NULL);
-                else if (cmd == ID_CLEAR)
-                    s_clear();
+            switch (cmd) {
+            case ID_COPY:
+                copy();
+                break;
+            case ID_CLEAR:
+                s_clear();
+                break;
             }
             return 0;
         }

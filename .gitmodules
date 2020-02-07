@@ -1,4 +1,4 @@
-[submodule "common"]
+[submodule "foobar2000"]
 	path = foobar2000
 	url = https://github.com/reupen/foobar2000-sdk.git
 [submodule "columns_ui-sdk"]
@@ -7,3 +7,9 @@
 [submodule "pfc"]
 	path = pfc
 	url = https://github.com/reupen/pfc.git
+[submodule "ui_helpers"]
+	path = ui_helpers
+	url = https://github.com/reupen/ui_helpers.git
+[submodule "mmh"]
+	path = mmh
+	url = https://github.com/reupen/mmh.git
