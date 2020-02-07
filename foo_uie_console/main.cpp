@@ -43,7 +43,14 @@ constexpr auto ID_TIMER = 667;
 /** \brief The maximum number of message we cache/display */
 constexpr t_size maximum_messages = 200;
 
-cfg_int cfg_frame(GUID{0x05550547, 0xbf98, 0x088c, 0xbe, 0x0e, 0x24, 0x95, 0xe4, 0x9b, 0x88, 0xc7}, 2);
+enum class EdgeStyle : int {
+    None = 0,
+    Sunken = 1,
+    Grey = 2,
+};
+
+cfg_int cfg_last_edge_style(GUID{0x05550547, 0xbf98, 0x088c, 0xbe, 0x0e, 0x24, 0x95, 0xe4, 0x9b, 0x88, 0xc7},
+    static_cast<int>(EdgeStyle::None));
 
 constexpr GUID console_font_id = {0x26059feb, 0x488b, 0x4ce1, {0x82, 0x4e, 0x4d, 0xf1, 0x13, 0xb4, 0x55, 0x8e}};
 
@@ -52,6 +59,7 @@ constexpr GUID console_font_id = {0x26059feb, 0x488b, 0x4ce1, {0x82, 0x4e, 0x4d,
  * and generate your own using GUIDGEN.
  */
 constexpr GUID window_id{0x3c85d0a9, 0x19d5, 0x4144, {0xbc, 0xc2, 0x94, 0x9a, 0xb7, 0x64, 0x23, 0x3a}};
+constexpr auto current_config_version = 0;
 
 class Message {
 public:
@@ -64,7 +72,6 @@ public:
 class ConsoleWindow : public ui_extension::container_ui_extension {
 public:
     static void s_update_all_fonts();
-    static void s_update_all_window_frames();
     static void s_on_message_received(const char* ptr, t_size len); // from any thread
 
     const GUID& get_extension_guid() const override { return window_id; }
@@ -82,8 +89,16 @@ public:
         __implement_get_class_data(_T("{89A3759F-348A-4e3f-BF43-3D16BC059186}"), false);
     }
 
+    void get_config(stream_writer* writer, abort_callback& abort) const override;
+    void set_config(stream_reader* reader, t_size p_size, abort_callback& abort) override;
+
+    void get_menu_items(uie::menu_hook_t& p_hook) override;
+
+    long get_edit_ex_styles() const;
     void update_content();
     void update_content_throttled();
+    EdgeStyle get_edge_style() const { return m_edge_style; }
+    void set_edge_style(EdgeStyle edge_style);
 
 private:
     static LRESULT WINAPI hook_proc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp);
@@ -103,6 +118,7 @@ private:
     WNDPROC m_editproc{};
     LARGE_INTEGER m_time_last_update{};
     bool m_timer_active{};
+    EdgeStyle m_edge_style{cfg_last_edge_style.get_value()};
 };
 
 std::vector<HWND> ConsoleWindow::s_notify_list;
@@ -132,20 +148,16 @@ void ConsoleWindow::s_update_all_fonts()
     }
 }
 
-void ConsoleWindow::s_update_all_window_frames()
+void ConsoleWindow::set_edge_style(EdgeStyle edge_style)
 {
-    long flags = 0;
-    if (cfg_frame == 1)
-        flags |= WS_EX_CLIENTEDGE;
-    if (cfg_frame == 2)
-        flags |= WS_EX_STATICEDGE;
+    m_edge_style = edge_style;
+    cfg_last_edge_style = static_cast<int32_t>(edge_style);
 
-    for (auto&& window : s_windows) {
-        const HWND wnd = window->m_wnd_edit;
-        if (wnd) {
-            SetWindowLongPtr(wnd, GWL_EXSTYLE, flags);
-            SetWindowPos(wnd, nullptr, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
-        }
+    const auto flags = get_edit_ex_styles();
+
+    if (m_wnd_edit) {
+        SetWindowLongPtr(m_wnd_edit, GWL_EXSTYLE, flags);
+        SetWindowPos(m_wnd_edit, nullptr, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
     }
 }
 
@@ -215,6 +227,79 @@ void ConsoleWindow::s_clear()
     }
 }
 
+void ConsoleWindow::get_config(stream_writer* writer, abort_callback& abort) const
+{
+    writer->write_lendian_t(current_config_version, abort);
+    writer->write_lendian_t(static_cast<int32_t>(m_edge_style), abort);
+}
+
+void ConsoleWindow::set_config(stream_reader* reader, t_size p_size, abort_callback& abort)
+{
+    int32_t version{};
+    try {
+        reader->read_lendian_t(version, abort);
+    } catch (const exception_io_data_truncation&) {
+        return;
+    }
+
+    if (version <= current_config_version) {
+        int32_t edge_style{};
+        reader->read_lendian_t(edge_style, abort);
+        m_edge_style = EdgeStyle{edge_style};
+    }
+}
+
+class EdgeStyleMenuNode : public uie::menu_node_popup_t {
+public:
+    EdgeStyleMenuNode(service_ptr_t<ConsoleWindow> window)
+    {
+        const auto current_edge_style = window->get_edge_style();
+
+        m_nodes.emplace_back("None", "Set the edge style to 'None'",
+            current_edge_style == EdgeStyle::None ? state_radiochecked : 0,
+            [window] { window->set_edge_style(EdgeStyle::None); });
+
+        m_nodes.emplace_back("Sunken", "Set the edge style to 'Sunken'",
+            current_edge_style == EdgeStyle::Sunken ? state_radiochecked : 0,
+            [window] { window->set_edge_style(EdgeStyle::Sunken); });
+
+        m_nodes.emplace_back("Grey", "Set the edge style to 'Grey'",
+            current_edge_style == EdgeStyle::Grey ? state_radiochecked : 0,
+            [window] { window->set_edge_style(EdgeStyle::Grey); });
+    }
+
+    t_size get_children_count() const override { return m_nodes.size(); }
+    void get_child(t_size index, uie::menu_node_ptr& p_out) const override
+    {
+        if (index < m_nodes.size())
+            p_out = new uie::simple_command_menu_node(m_nodes[index]);
+    }
+    bool get_display_data(pfc::string_base& p_out, unsigned& p_state) const override
+    {
+        p_out = "Edge style";
+        return true;
+    }
+
+private:
+    std::vector<uie::simple_command_menu_node> m_nodes;
+};
+
+void ConsoleWindow::get_menu_items(uie::menu_hook_t& p_hook)
+{
+    p_hook.add_node(new EdgeStyleMenuNode(this));
+}
+
+long ConsoleWindow::get_edit_ex_styles() const
+{
+    if (m_edge_style == EdgeStyle::Sunken)
+        return WS_EX_CLIENTEDGE;
+
+    if (m_edge_style == EdgeStyle::Grey)
+        return WS_EX_STATICEDGE;
+
+    return 0;
+}
+
 void ConsoleWindow::update_content()
 {
     std::scoped_lock<std::mutex> _(s_mutex);
@@ -266,14 +351,10 @@ LRESULT ConsoleWindow::on_message(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
             s_notify_list.emplace_back(wnd);
         }
 
-        long flags = 0;
-        if (cfg_frame == 1)
-            flags |= WS_EX_CLIENTEDGE;
-        else if (cfg_frame == 2)
-            flags |= WS_EX_STATICEDGE;
+        const auto edit_ex_styles = get_edit_ex_styles();
 
         /** Create our edit window */
-        m_wnd_edit = CreateWindowEx(flags, WC_EDIT, _T(""),
+        m_wnd_edit = CreateWindowEx(edit_ex_styles, WC_EDIT, _T(""),
             WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOVSCROLL | WS_VSCROLL | ES_READONLY | ES_MULTILINE, 0, 0, 0, 0,
             wnd, HMENU(IDC_EDIT), core_api::get_my_instance(), nullptr);
 
@@ -362,7 +443,7 @@ LRESULT ConsoleWindow::on_hook(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
         break;
     case WM_CONTEXTMENU:
         if (wnd == reinterpret_cast<HWND>(wp)) {
-            enum { ID_COPY = 1, ID_CLEAR = 2 };
+            enum { ID_COPY = 1, ID_CLEAR, ID_EDGE_STYLE_NONE, ID_EDGE_STYLE_SUNKEN, ID_EDGE_STYLE_GREY };
 
             POINT pt = {GET_X_LPARAM(lp), GET_Y_LPARAM(lp)};
             if (pt.x == -1 && pt.y == -1) {
@@ -377,6 +458,17 @@ LRESULT ConsoleWindow::on_hook(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
             menu.append_command(L"&Copy", ID_COPY);
             menu.append_separator();
             menu.append_command(L"&Clear", ID_CLEAR);
+            menu.append_separator();
+
+            uih::Menu edge_style_submenu;
+            edge_style_submenu.append_command(
+                L"&None", ID_EDGE_STYLE_NONE, m_edge_style == EdgeStyle::None ? uih::Menu::flag_radiochecked : 0);
+            edge_style_submenu.append_command(
+                L"&Sunken", ID_EDGE_STYLE_SUNKEN, m_edge_style == EdgeStyle::Sunken ? uih::Menu::flag_radiochecked : 0);
+            edge_style_submenu.append_command(
+                L"&Grey", ID_EDGE_STYLE_GREY, m_edge_style == EdgeStyle::Grey ? uih::Menu::flag_radiochecked : 0);
+
+            menu.append_submenu(L"&Edge style", edge_style_submenu.detach());
 
             const int cmd = menu.run(wnd, pt);
 
@@ -386,6 +478,15 @@ LRESULT ConsoleWindow::on_hook(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
                 break;
             case ID_CLEAR:
                 s_clear();
+                break;
+            case ID_EDGE_STYLE_NONE:
+                set_edge_style(EdgeStyle::None);
+                break;
+            case ID_EDGE_STYLE_SUNKEN:
+                set_edge_style(EdgeStyle::Sunken);
+                break;
+            case ID_EDGE_STYLE_GREY:
+                set_edge_style(EdgeStyle::Grey);
                 break;
             }
             return 0;
