@@ -12,6 +12,11 @@ jobs:
   steps:
   - checkout: self
     submodules: recursive
+  - powershell: |
+      Set-PSDebug -Trace 1
+      vcpkg integrate install
+      vcpkg install ms-gsl
+    displayName: Install dependencies
   - task: VSBuild@1
     displayName: Build
     inputs:
