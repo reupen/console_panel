@@ -30,7 +30,7 @@
 #include "../columns_ui-sdk/ui_extension.h"
 
 /** Declare some component information */
-DECLARE_COMPONENT_VERSION("Console panel", "0.5",
+DECLARE_COMPONENT_VERSION("Console panel", "1.0.0",
     "compiled: " __DATE__ "\n"
     "with Panel API version: " UI_EXTENSION_VERSION
 
