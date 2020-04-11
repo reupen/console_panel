@@ -30,7 +30,7 @@
 #include "../columns_ui-sdk/ui_extension.h"
 
 /** Declare some component information */
-DECLARE_COMPONENT_VERSION("Console panel", "1.0.0",
+DECLARE_COMPONENT_VERSION("Console panel", "1.0.1",
     "compiled: " __DATE__ "\n"
     "with Panel API version: " UI_EXTENSION_VERSION
 
@@ -190,7 +190,7 @@ void ConsoleWindow::s_on_message_received(const char* ptr, t_size len)
     }
     s_messages.emplace_back(Message({buffer.get_ptr(), buffer.get_length()}));
     if (s_messages.size() == maximum_messages)
-        s_messages.pop_back();
+        s_messages.pop_front();
 
     /** Post a notification to all instances of the panel to update their display */
     for (auto&& wnd : s_notify_list) {
