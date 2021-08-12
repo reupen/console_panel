@@ -7,7 +7,7 @@
  *
  * It demonstrates the following relevant techniques:
  * - Subclassing the child control to process keyboard shortcuts
- * - Setting the font of the child window
+ * - Setting the font and colours of the child window
  * - Keeping a list of active windows and updating them from a callback (in this case designed
  *   such that the callback may come from any thread)
  * - That's about it ?
@@ -54,6 +54,8 @@ cfg_int cfg_last_edge_style(GUID{0x05550547, 0xbf98, 0x088c, 0xbe, 0x0e, 0x24, 0
 
 constexpr GUID console_font_id = {0x26059feb, 0x488b, 0x4ce1, {0x82, 0x4e, 0x4d, 0xf1, 0x13, 0xb4, 0x55, 0x8e}};
 
+constexpr GUID console_colours_client_id = {0x9d814898, 0x0db4, 0x4591, {0xa7, 0xaa, 0x4e, 0x94, 0xdd, 0x07, 0xb3, 0x87}};
+
 /**
  * This is the unique GUID identifying our panel. You should not re-use this one
  * and generate your own using GUIDGEN.
@@ -72,6 +74,7 @@ public:
 class ConsoleWindow : public ui_extension::container_ui_extension {
 public:
     static void s_update_all_fonts();
+    static void s_update_colours();
     static void s_on_message_received(const char* ptr, t_size len); // from any thread
 
     const GUID& get_extension_guid() const override { return window_id; }
@@ -110,6 +113,7 @@ private:
 
     static std::mutex s_mutex;
     static HFONT s_font;
+    static HBRUSH s_background_brush;
     static std::deque<Message> s_messages;
     static std::vector<HWND> s_notify_list;
     static std::vector<service_ptr_t<ConsoleWindow>> s_windows;
@@ -124,6 +128,7 @@ private:
 std::vector<HWND> ConsoleWindow::s_notify_list;
 std::vector<service_ptr_t<ConsoleWindow>> ConsoleWindow::s_windows;
 HFONT ConsoleWindow::s_font{};
+HBRUSH ConsoleWindow::s_background_brush{};
 std::deque<Message> ConsoleWindow::s_messages;
 std::mutex ConsoleWindow::s_mutex;
 
@@ -145,6 +150,22 @@ void ConsoleWindow::s_update_all_fonts()
         if (wnd) {
             SetWindowFont(wnd, s_font, TRUE);
         }
+    }
+}
+
+void ConsoleWindow::s_update_colours()
+{
+    if (s_background_brush != nullptr)
+        DeleteObject(s_background_brush);
+
+    cui::colours::helper helper(console_colours_client_id);
+
+    s_background_brush = CreateSolidBrush(helper.get_colour(cui::colours::colour_background));
+
+    for (auto&& window : s_windows) {
+        const HWND wnd = window->m_wnd_edit;
+        if (wnd)
+            RedrawWindow(wnd, nullptr, nullptr, RDW_INVALIDATE);
     }
 }
 
@@ -366,6 +387,9 @@ LRESULT ConsoleWindow::on_message(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
                 /** First window - create the font handle */
                 s_update_all_fonts();
 
+            if (!s_background_brush)
+                s_update_colours();
+
             /** Store a pointer to ourself in the user data field of the edit window */
             SetWindowLongPtr(m_wnd_edit, GWL_USERDATA, reinterpret_cast<LPARAM>(this));
             /** Subclass the edit window */
@@ -391,6 +415,16 @@ LRESULT ConsoleWindow::on_message(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
         /** Reposition the edit window. */
         SetWindowPos(m_wnd_edit, nullptr, 0, 0, LOWORD(lp), HIWORD(lp), SWP_NOZORDER);
         break;
+    case WM_CTLCOLORSTATIC: {
+        const auto dc = reinterpret_cast<HDC>(wp);
+
+        cui::colours::helper helper(console_colours_client_id);
+
+        SetTextColor(dc, helper.get_colour(cui::colours::colour_text));
+        SetBkColor(dc, helper.get_colour(cui::colours::colour_background));
+
+        return reinterpret_cast<LRESULT>(s_background_brush);
+    }
     case WM_ERASEBKGND:
         return FALSE;
     case WM_DESTROY:
@@ -406,6 +440,8 @@ LRESULT ConsoleWindow::on_message(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
         if (s_windows.empty()) {
             DeleteFont(s_font);
             s_font = nullptr;
+            DeleteObject(s_background_brush);
+            s_background_brush = nullptr;
         }
         break;
     }
@@ -527,4 +563,22 @@ public:
     void on_font_changed() const override { ConsoleWindow::s_update_all_fonts(); }
 };
 
+class ConsoleColourClient : public cui::colours::client {
+public:
+    const GUID& get_client_guid() const override { return console_colours_client_id; }
+    void get_name(pfc::string_base& p_out) const override { p_out = "Console"; }
+
+    t_size get_supported_colours() const override
+    {
+        return cui::colours::colour_flag_background | cui::colours::colour_flag_text;
+    };
+    t_size get_supported_bools() const override { return 0; };
+
+    bool get_themes_supported() const override { return false; };
+
+    void on_bool_changed(t_size mask) const override{};
+    void on_colour_changed(t_size mask) const override { ConsoleWindow::s_update_colours(); };
+};
+
 static ConsoleFontClient::factory<ConsoleFontClient> console_font_client;
+static ConsoleFontClient::factory<ConsoleColourClient> console_colour_client;
