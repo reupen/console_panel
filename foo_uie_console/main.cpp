@@ -581,4 +581,4 @@ public:
 };
 
 static ConsoleFontClient::factory<ConsoleFontClient> console_font_client;
-static ConsoleFontClient::factory<ConsoleColourClient> console_colour_client;
+static ConsoleColourClient::factory<ConsoleColourClient> console_colour_client;
