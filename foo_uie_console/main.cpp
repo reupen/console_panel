@@ -52,6 +52,9 @@ enum class EdgeStyle : int {
 cfg_int cfg_last_edge_style(GUID{0x05550547, 0xbf98, 0x088c, 0xbe, 0x0e, 0x24, 0x95, 0xe4, 0x9b, 0x88, 0xc7},
     static_cast<int>(EdgeStyle::None));
 
+cfg_bool cfg_last_hide_trailing_newline(
+    {0x5db0b4d6, 0xf429, 0x4fc5, 0xb9, 0x1d, 0x29, 0x8e, 0xf3, 0x34, 0x75, 0x16}, false);
+
 constexpr GUID console_font_id = {0x26059feb, 0x488b, 0x4ce1, {0x82, 0x4e, 0x4d, 0xf1, 0x13, 0xb4, 0x55, 0x8e}};
 
 constexpr GUID console_colours_client_id = {0x9d814898, 0x0db4, 0x4591, {0xa7, 0xaa, 0x4e, 0x94, 0xdd, 0x07, 0xb3, 0x87}};
@@ -102,6 +105,8 @@ public:
     void update_content_throttled();
     EdgeStyle get_edge_style() const { return m_edge_style; }
     void set_edge_style(EdgeStyle edge_style);
+    bool get_hide_trailing_newline() const { return m_hide_trailing_newline; }
+    void set_hide_trailing_newline(bool hide_trailing_newline);
 
 private:
     static LRESULT WINAPI hook_proc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp);
@@ -113,7 +118,7 @@ private:
 
     static std::mutex s_mutex;
     static HFONT s_font;
-    static HBRUSH s_background_brush;
+    static wil::unique_hbrush s_background_brush;
     static std::deque<Message> s_messages;
     static std::vector<HWND> s_notify_list;
     static std::vector<service_ptr_t<ConsoleWindow>> s_windows;
@@ -123,12 +128,13 @@ private:
     LARGE_INTEGER m_time_last_update{};
     bool m_timer_active{};
     EdgeStyle m_edge_style{cfg_last_edge_style.get_value()};
+    bool m_hide_trailing_newline{cfg_last_hide_trailing_newline.get_value()};
 };
 
 std::vector<HWND> ConsoleWindow::s_notify_list;
 std::vector<service_ptr_t<ConsoleWindow>> ConsoleWindow::s_windows;
 HFONT ConsoleWindow::s_font{};
-HBRUSH ConsoleWindow::s_background_brush{};
+wil::unique_hbrush ConsoleWindow::s_background_brush;
 std::deque<Message> ConsoleWindow::s_messages;
 std::mutex ConsoleWindow::s_mutex;
 
@@ -155,12 +161,8 @@ void ConsoleWindow::s_update_all_fonts()
 
 void ConsoleWindow::s_update_colours()
 {
-    if (s_background_brush != nullptr)
-        DeleteObject(s_background_brush);
-
-    cui::colours::helper helper(console_colours_client_id);
-
-    s_background_brush = CreateSolidBrush(helper.get_colour(cui::colours::colour_background));
+    s_background_brush.reset(
+        CreateSolidBrush(cui::colours::helper(console_colours_client_id).get_colour(cui::colours::colour_background)));
 
     for (auto&& window : s_windows) {
         const HWND wnd = window->m_wnd_edit;
@@ -180,6 +182,13 @@ void ConsoleWindow::set_edge_style(EdgeStyle edge_style)
         SetWindowLongPtr(m_wnd_edit, GWL_EXSTYLE, flags);
         SetWindowPos(m_wnd_edit, nullptr, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
     }
+}
+
+void ConsoleWindow::set_hide_trailing_newline(bool hide_trailing_newline)
+{
+    cfg_last_hide_trailing_newline = m_hide_trailing_newline = hide_trailing_newline;
+
+    update_content_throttled();
 }
 
 void ConsoleWindow::s_on_message_received(const char* ptr, t_size len)
@@ -252,6 +261,7 @@ void ConsoleWindow::get_config(stream_writer* writer, abort_callback& abort) con
 {
     writer->write_lendian_t(current_config_version, abort);
     writer->write_lendian_t(static_cast<int32_t>(m_edge_style), abort);
+    writer->write_object_t(m_hide_trailing_newline, abort);
 }
 
 void ConsoleWindow::set_config(stream_reader* reader, t_size p_size, abort_callback& abort)
@@ -267,6 +277,12 @@ void ConsoleWindow::set_config(stream_reader* reader, t_size p_size, abort_callb
         int32_t edge_style{};
         reader->read_lendian_t(edge_style, abort);
         m_edge_style = EdgeStyle{edge_style};
+
+        // Gracefully handle the new 'hide trailing newline' config bits when updating the component
+        try {
+            reader->read_object_t(m_hide_trailing_newline, abort);
+        } catch (const exception_io_data_truncation&) {
+        }
     }
 }
 
@@ -308,6 +324,9 @@ private:
 void ConsoleWindow::get_menu_items(uie::menu_hook_t& p_hook)
 {
     p_hook.add_node(new EdgeStyleMenuNode(this));
+    p_hook.add_node(new uie::simple_command_menu_node("Hide trailing newline",
+        "Toggles visibility of the trailing newline.", get_hide_trailing_newline() ? uih::Menu::flag_checked : 0,
+        [this, self = ptr{this}] { set_hide_trailing_newline(!get_hide_trailing_newline()); }));
 }
 
 long ConsoleWindow::get_edit_ex_styles() const
@@ -331,6 +350,10 @@ void ConsoleWindow::update_content()
         buffer << "[" << pfc::format_int(message.m_time.wHour, 2) << ":" << pfc::format_int(message.m_time.wMinute, 2)
                << ":" << pfc::format_int(message.m_time.wSecond, 2) << "] " << message.m_message.c_str();
     }
+
+    if (m_hide_trailing_newline && !buffer.is_empty())
+        buffer.truncate(std::string_view(buffer.c_str()).find_last_not_of("\r\n") + 1);
+
     uSetWindowText(m_wnd_edit, buffer);
     const int len = Edit_GetLineCount(m_wnd_edit);
     Edit_Scroll(m_wnd_edit, len, 0);
@@ -423,7 +446,7 @@ LRESULT ConsoleWindow::on_message(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
         SetTextColor(dc, helper.get_colour(cui::colours::colour_text));
         SetBkColor(dc, helper.get_colour(cui::colours::colour_background));
 
-        return reinterpret_cast<LRESULT>(s_background_brush);
+        return reinterpret_cast<LRESULT>(s_background_brush.get());
     }
     case WM_ERASEBKGND:
         return FALSE;
@@ -440,8 +463,7 @@ LRESULT ConsoleWindow::on_message(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
         if (s_windows.empty()) {
             DeleteFont(s_font);
             s_font = nullptr;
-            DeleteObject(s_background_brush);
-            s_background_brush = nullptr;
+            s_background_brush.reset();
         }
         break;
     }
@@ -479,7 +501,14 @@ LRESULT ConsoleWindow::on_hook(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
         break;
     case WM_CONTEXTMENU:
         if (wnd == reinterpret_cast<HWND>(wp)) {
-            enum { ID_COPY = 1, ID_CLEAR, ID_EDGE_STYLE_NONE, ID_EDGE_STYLE_SUNKEN, ID_EDGE_STYLE_GREY };
+            enum {
+                ID_COPY = 1,
+                ID_CLEAR,
+                ID_EDGE_STYLE_NONE,
+                ID_EDGE_STYLE_SUNKEN,
+                ID_EDGE_STYLE_GREY,
+                ID_HIDE_TRAILING_NEWLINE
+            };
 
             POINT pt = {GET_X_LPARAM(lp), GET_Y_LPARAM(lp)};
             if (pt.x == -1 && pt.y == -1) {
@@ -505,6 +534,8 @@ LRESULT ConsoleWindow::on_hook(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
                 L"&Grey", ID_EDGE_STYLE_GREY, m_edge_style == EdgeStyle::Grey ? uih::Menu::flag_radiochecked : 0);
 
             menu.append_submenu(L"&Edge style", edge_style_submenu.detach());
+            menu.append_command(L"&Hide trailing newline", ID_HIDE_TRAILING_NEWLINE,
+                m_hide_trailing_newline ? uih::Menu::flag_checked : 0);
 
             const int cmd = menu.run(wnd, pt);
 
@@ -523,6 +554,9 @@ LRESULT ConsoleWindow::on_hook(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
                 break;
             case ID_EDGE_STYLE_GREY:
                 set_edge_style(EdgeStyle::Grey);
+                break;
+            case ID_HIDE_TRAILING_NEWLINE:
+                set_hide_trailing_newline(!m_hide_trailing_newline);
                 break;
             }
             return 0;
