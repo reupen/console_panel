@@ -325,8 +325,8 @@ void ConsoleWindow::get_menu_items(uie::menu_hook_t& p_hook)
 {
     p_hook.add_node(new EdgeStyleMenuNode(this));
     p_hook.add_node(new uie::simple_command_menu_node("Hide trailing newline",
-        "Toggles visiblity of the trailing newline.", get_hide_trailing_newline() ? uih::Menu::flag_checked : 0,
-        [this, self = ptr{this}] { set_hide_trailing_newline(get_hide_trailing_newline()); }));
+        "Toggles visibility of the trailing newline.", get_hide_trailing_newline() ? uih::Menu::flag_checked : 0,
+        [this, self = ptr{this}] { set_hide_trailing_newline(!get_hide_trailing_newline()); }));
 }
 
 long ConsoleWindow::get_edit_ex_styles() const
