@@ -278,6 +278,7 @@ void ConsoleWindow::set_config(stream_reader* reader, t_size p_size, abort_callb
         reader->read_lendian_t(edge_style, abort);
         m_edge_style = EdgeStyle{edge_style};
 
+        // Gracefully handle the new 'hide trailing newline' config bits when updating the component
         try {
             reader->read_object_t(m_hide_trailing_newline, abort);
         } catch (const exception_io_data_truncation&) {
