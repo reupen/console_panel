@@ -1,5 +1,7 @@
 # Console panel
 
-[![Build status](https://reupen.visualstudio.com/Columns%20UI/_apis/build/status/reupen.console_panel?branchName=master)](https://reupen.visualstudio.com/Columns%20UI/_build/latest?definitionId=5&branchName=master)
+https://yuo.be/console-panel
+
+[![Build status](https://github.com/reupen/console_panel/actions/workflows/build.yml/badge.svg)](https://github.com/reupen/console_panel/actions/workflows/build.yml?query=branch%3Amaster)
 
 Console panel for Columns UI.
