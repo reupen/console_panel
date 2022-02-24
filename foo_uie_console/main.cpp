@@ -78,6 +78,7 @@ class ConsoleWindow : public ui_extension::container_ui_extension {
 public:
     static void s_update_all_fonts();
     static void s_update_colours();
+    static void s_update_window_themes();
     static void s_on_message_received(const char* ptr, t_size len); // from any thread
 
     const GUID& get_extension_guid() const override { return window_id; }
@@ -114,6 +115,7 @@ private:
 
     LRESULT on_message(HWND wnd, UINT msg, WPARAM wp, LPARAM lp) override;
     LRESULT on_hook(HWND wnd, UINT msg, WPARAM wp, LPARAM lp);
+    void set_window_theme() const;
     void copy() const;
 
     static std::mutex s_mutex;
@@ -168,6 +170,13 @@ void ConsoleWindow::s_update_colours()
         const HWND wnd = window->m_wnd_edit;
         if (wnd)
             RedrawWindow(wnd, nullptr, nullptr, RDW_INVALIDATE);
+    }
+}
+
+void ConsoleWindow::s_update_window_themes()
+{
+    for (auto&& window : s_windows) {
+        window->set_window_theme();
     }
 }
 
@@ -403,6 +412,8 @@ LRESULT ConsoleWindow::on_message(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
             wnd, HMENU(IDC_EDIT), core_api::get_my_instance(), nullptr);
 
         if (m_wnd_edit) {
+            set_window_theme();
+
             if (s_font) {
                 /** Nth, n>1, instance; use exisiting font handle */
                 SetWindowFont(m_wnd_edit, s_font, FALSE);
@@ -566,6 +577,14 @@ LRESULT ConsoleWindow::on_hook(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
     return CallWindowProc(m_editproc, wnd, msg, wp, lp);
 }
 
+void ConsoleWindow::set_window_theme() const
+{
+    if (!m_wnd_edit)
+        return;
+
+    SetWindowTheme(m_wnd_edit, cui::colours::is_dark_mode_active() ? L"DarkMode_Explorer" : nullptr, nullptr);
+}
+
 static ui_extension::window_factory<ConsoleWindow> console_window_factory;
 
 class ConsoleReceiver : public console_receiver {
@@ -605,13 +624,19 @@ public:
     t_size get_supported_colours() const override
     {
         return cui::colours::colour_flag_background | cui::colours::colour_flag_text;
-    };
-    t_size get_supported_bools() const override { return 0; };
+    }
 
-    bool get_themes_supported() const override { return false; };
+    t_size get_supported_bools() const override { return cui::colours::bool_flag_dark_mode_enabled; }
 
-    void on_bool_changed(t_size mask) const override{};
-    void on_colour_changed(t_size mask) const override { ConsoleWindow::s_update_colours(); };
+    bool get_themes_supported() const override { return false; }
+
+    void on_bool_changed(t_size mask) const override
+    {
+        if (mask & cui::colours::bool_flag_dark_mode_enabled) {
+            ConsoleWindow::s_update_window_themes();
+        }
+    }
+    void on_colour_changed(t_size mask) const override { ConsoleWindow::s_update_colours(); }
 };
 
 static ConsoleFontClient::factory<ConsoleFontClient> console_font_client;
