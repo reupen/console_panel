@@ -490,6 +490,11 @@ LRESULT WINAPI ConsoleWindow::hook_proc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp
 LRESULT ConsoleWindow::on_hook(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
 {
     switch (msg) {
+    case WM_ERASEBKGND:
+        return FALSE;
+    case WM_PAINT:
+        uih::paint_subclassed_window_with_buffering(wnd, m_editproc);
+        return 0;
     case WM_KEYDOWN:
         /**
          * It's possible to assign right, left, up and down keys to keyboard shortcuts. But we would rather
