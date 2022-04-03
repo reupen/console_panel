@@ -13,6 +13,8 @@
  * - That's about it ?
  */
 
+#define NOMINMAX
+
 #include <algorithm>
 #include <deque>
 #include <mutex>
@@ -57,7 +59,8 @@ cfg_bool cfg_last_hide_trailing_newline(
 
 constexpr GUID console_font_id = {0x26059feb, 0x488b, 0x4ce1, {0x82, 0x4e, 0x4d, 0xf1, 0x13, 0xb4, 0x55, 0x8e}};
 
-constexpr GUID console_colours_client_id = {0x9d814898, 0x0db4, 0x4591, {0xa7, 0xaa, 0x4e, 0x94, 0xdd, 0x07, 0xb3, 0x87}};
+constexpr GUID console_colours_client_id
+    = {0x9d814898, 0x0db4, 0x4591, {0xa7, 0xaa, 0x4e, 0x94, 0xdd, 0x07, 0xb3, 0x87}};
 
 /**
  * This is the unique GUID identifying our panel. You should not re-use this one
@@ -74,7 +77,7 @@ public:
     Message(std::string_view message) : m_message(message) { GetLocalTime(&m_time); }
 };
 
-class ConsoleWindow : public ui_extension::container_ui_extension {
+class ConsoleWindow : public uie::container_uie_window_v3 {
 public:
     static void s_update_all_fonts();
     static void s_update_colours();
@@ -91,10 +94,7 @@ public:
         return ui_extension::type_panel;
     }
 
-    class_data& get_class_data() const override
-    {
-        __implement_get_class_data(_T("{89A3759F-348A-4e3f-BF43-3D16BC059186}"), false);
-    }
+    uie::container_window_v3_config get_window_config() override { return {L"{89A3759F-348A-4e3f-BF43-3D16BC059186}"}; }
 
     void get_config(stream_writer* writer, abort_callback& abort) const override;
     void set_config(stream_reader* reader, t_size p_size, abort_callback& abort) override;
@@ -490,6 +490,11 @@ LRESULT WINAPI ConsoleWindow::hook_proc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp
 LRESULT ConsoleWindow::on_hook(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
 {
     switch (msg) {
+    case WM_ERASEBKGND:
+        return FALSE;
+    case WM_PAINT:
+        uih::paint_subclassed_window_with_buffering(wnd, m_editproc);
+        return 0;
     case WM_KEYDOWN:
         /**
          * It's possible to assign right, left, up and down keys to keyboard shortcuts. But we would rather
