@@ -39,6 +39,9 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Libraries", "Libraries", "{2CF30470-5AEE-488B-80FF-436E3630476E}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".github", ".github", "{586EFEA0-D6B0-4905-8FE2-FD41A3A3522C}"
+	ProjectSection(SolutionItems) = preProject
+		..\.github\dependabot.yml = ..\.github\dependabot.yml
+	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "workflows", "workflows", "{DB875618-1ADB-4175-91D0-70E8AAAB3BF4}"
 	ProjectSection(SolutionItems) = preProject
