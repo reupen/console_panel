@@ -77,7 +77,7 @@ public:
     Message(std::string_view message) : m_message(message) { GetLocalTime(&m_time); }
 };
 
-class ConsoleWindow : public ui_extension::container_ui_extension {
+class ConsoleWindow : public uie::container_uie_window_v3 {
 public:
     static void s_update_all_fonts();
     static void s_update_colours();
@@ -94,10 +94,7 @@ public:
         return ui_extension::type_panel;
     }
 
-    class_data& get_class_data() const override
-    {
-        __implement_get_class_data(_T("{89A3759F-348A-4e3f-BF43-3D16BC059186}"), false);
-    }
+    uie::container_window_v3_config get_window_config() override { return {L"{89A3759F-348A-4e3f-BF43-3D16BC059186}"}; }
 
     void get_config(stream_writer* writer, abort_callback& abort) const override;
     void set_config(stream_reader* reader, t_size p_size, abort_callback& abort) override;
