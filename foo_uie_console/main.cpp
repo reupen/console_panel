@@ -13,6 +13,8 @@
  * - That's about it ?
  */
 
+#define NOMINMAX
+
 #include <algorithm>
 #include <deque>
 #include <mutex>
