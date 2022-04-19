@@ -409,7 +409,7 @@ LRESULT ConsoleWindow::on_message(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
         /** Create our edit window */
         m_wnd_edit = CreateWindowEx(edit_ex_styles, WC_EDIT, _T(""),
             WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOVSCROLL | WS_VSCROLL | ES_READONLY | ES_MULTILINE, 0, 0, 0, 0,
-            wnd, HMENU(IDC_EDIT), core_api::get_my_instance(), nullptr);
+            wnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDC_EDIT)), core_api::get_my_instance(), nullptr);
 
         if (m_wnd_edit) {
             set_window_theme();
@@ -425,10 +425,10 @@ LRESULT ConsoleWindow::on_message(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
                 s_update_colours();
 
             /** Store a pointer to ourself in the user data field of the edit window */
-            SetWindowLongPtr(m_wnd_edit, GWL_USERDATA, reinterpret_cast<LPARAM>(this));
+            SetWindowLongPtr(m_wnd_edit, GWLP_USERDATA, reinterpret_cast<LPARAM>(this));
             /** Subclass the edit window */
             m_editproc = reinterpret_cast<WNDPROC>(
-                SetWindowLongPtr(m_wnd_edit, GWL_WNDPROC, reinterpret_cast<LPARAM>(hook_proc)));
+                SetWindowLongPtr(m_wnd_edit, GWLP_WNDPROC, reinterpret_cast<LPARAM>(hook_proc)));
 
             SendMessage(wnd, MSG_UPDATE, 0, 0);
         }
@@ -483,7 +483,7 @@ LRESULT ConsoleWindow::on_message(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
 
 LRESULT WINAPI ConsoleWindow::hook_proc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
 {
-    auto* self = reinterpret_cast<ConsoleWindow*>(GetWindowLongPtr(wnd, GWL_USERDATA));
+    auto* self = reinterpret_cast<ConsoleWindow*>(GetWindowLongPtr(wnd, GWLP_USERDATA));
     return self ? self->on_hook(wnd, msg, wp, lp) : DefWindowProc(wnd, msg, wp, lp);
 }
 
@@ -553,7 +553,7 @@ LRESULT ConsoleWindow::on_hook(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
             menu.append_command(L"&Hide trailing newline", ID_HIDE_TRAILING_NEWLINE,
                 m_hide_trailing_newline ? uih::Menu::flag_checked : 0);
 
-            const int cmd = menu.run(wnd, pt);
+            const auto cmd = menu.run(wnd, pt);
 
             switch (cmd) {
             case ID_COPY:
@@ -602,7 +602,7 @@ class ConsoleReceiver : public console_receiver {
      * Check the documentation of the callback to find out if this is true for
      * the callback you wish to use.
      */
-    void print(const char* p_message, unsigned p_message_length) override
+    void print(const char* p_message, size_t p_message_length) override
     {
         ConsoleWindow::s_on_message_received(p_message, p_message_length);
     }
@@ -626,22 +626,22 @@ public:
     const GUID& get_client_guid() const override { return console_colours_client_id; }
     void get_name(pfc::string_base& p_out) const override { p_out = "Console"; }
 
-    t_size get_supported_colours() const override
+    uint32_t get_supported_colours() const override
     {
         return cui::colours::colour_flag_background | cui::colours::colour_flag_text;
     }
 
-    t_size get_supported_bools() const override { return cui::colours::bool_flag_dark_mode_enabled; }
+    uint32_t get_supported_bools() const override { return cui::colours::bool_flag_dark_mode_enabled; }
 
     bool get_themes_supported() const override { return false; }
 
-    void on_bool_changed(t_size mask) const override
+    void on_bool_changed(uint32_t mask) const override
     {
         if (mask & cui::colours::bool_flag_dark_mode_enabled) {
             ConsoleWindow::s_update_window_themes();
         }
     }
-    void on_colour_changed(t_size mask) const override { ConsoleWindow::s_update_colours(); }
+    void on_colour_changed(uint32_t mask) const override { ConsoleWindow::s_update_colours(); }
 };
 
 static ConsoleFontClient::factory<ConsoleFontClient> console_font_client;
