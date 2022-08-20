@@ -137,7 +137,7 @@
       <Culture>0x0809</Culture>
     </ResourceCompile>
     <Link>
-      <AdditionalDependencies>comctl32.lib;shell32.lib;shlwapi.lib;gdiplus.lib;../foobar2000/shared/shared.lib;Msimg32.lib;uxtheme.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>comctl32.lib;shell32.lib;shlwapi.lib;gdiplus.lib;../foobar2000/shared/shared-$(Platform).lib;Msimg32.lib;uxtheme.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -146,6 +146,18 @@
       </DataExecutionPrevention>
       <SubSystem>Windows</SubSystem>
     </Link>
+    <PreBuildEvent>
+      <Command>py ..\scripts\pre-build.py</Command>
+    </PreBuildEvent>
+    <PreBuildEvent>
+      <Message>Setting version number...</Message>
+    </PreBuildEvent>
+    <PostBuildEvent>
+      <Command>py ..\scripts\post-build.py $(TargetPath) $(TargetDir) $(Platform)</Command>
+    </PostBuildEvent>
+    <PostBuildEvent>
+      <Message>Creating archive...</Message>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Midl>
@@ -175,7 +187,7 @@
       <Culture>0x0809</Culture>
     </ResourceCompile>
     <Link>
-      <AdditionalDependencies>comctl32.lib;shell32.lib;shlwapi.lib;gdiplus.lib;../foobar2000/shared/shared.lib;Msimg32.lib;uxtheme.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>comctl32.lib;shell32.lib;shlwapi.lib;gdiplus.lib;../foobar2000/shared/shared-$(Platform).lib;Msimg32.lib;uxtheme.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -184,6 +196,18 @@
       </DataExecutionPrevention>
       <SubSystem>Windows</SubSystem>
     </Link>
+    <PreBuildEvent>
+      <Command>py ..\scripts\pre-build.py</Command>
+    </PreBuildEvent>
+    <PreBuildEvent>
+      <Message>Setting version number...</Message>
+    </PreBuildEvent>
+    <PostBuildEvent>
+      <Command>py ..\scripts\post-build.py $(TargetPath) $(TargetDir) $(Platform)</Command>
+    </PostBuildEvent>
+    <PostBuildEvent>
+      <Message>Creating archive...</Message>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <Midl>
@@ -214,13 +238,25 @@
       <Culture>0x0809</Culture>
     </ResourceCompile>
     <Link>
-      <AdditionalDependencies>comctl32.lib;shell32.lib;shlwapi.lib;gdiplus.lib;../foobar2000/shared/shared.lib;Msimg32.lib;uxtheme.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>comctl32.lib;shell32.lib;shlwapi.lib;gdiplus.lib;../foobar2000/shared/shared-$(Platform).lib;Msimg32.lib;uxtheme.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <DataExecutionPrevention>
       </DataExecutionPrevention>
       <SubSystem>Windows</SubSystem>
       <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
     </Link>
+    <PreBuildEvent>
+      <Command>py ..\scripts\pre-build.py</Command>
+    </PreBuildEvent>
+    <PreBuildEvent>
+      <Message>Setting version number...</Message>
+    </PreBuildEvent>
+    <PostBuildEvent>
+      <Command>py ..\scripts\post-build.py $(TargetPath) $(TargetDir) $(Platform)</Command>
+    </PostBuildEvent>
+    <PostBuildEvent>
+      <Message>Creating archive...</Message>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Midl>
@@ -250,12 +286,24 @@
       <Culture>0x0809</Culture>
     </ResourceCompile>
     <Link>
-      <AdditionalDependencies>comctl32.lib;shell32.lib;shlwapi.lib;gdiplus.lib;../foobar2000/shared/shared.lib;Msimg32.lib;uxtheme.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>comctl32.lib;shell32.lib;shlwapi.lib;gdiplus.lib;../foobar2000/shared/shared-$(Platform).lib;Msimg32.lib;uxtheme.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <DataExecutionPrevention>
       </DataExecutionPrevention>
       <SubSystem>Windows</SubSystem>
     </Link>
+    <PreBuildEvent>
+      <Command>py ..\scripts\pre-build.py</Command>
+    </PreBuildEvent>
+    <PreBuildEvent>
+      <Message>Setting version number...</Message>
+    </PreBuildEvent>
+    <PostBuildEvent>
+      <Command>py ..\scripts\post-build.py $(TargetPath) $(TargetDir) $(Platform)</Command>
+    </PostBuildEvent>
+    <PostBuildEvent>
+      <Message>Creating archive...</Message>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include=".\main.cpp" />
@@ -279,6 +327,9 @@
     <ProjectReference Include="..\ui_helpers\ui_helpers.vcxproj">
       <Project>{a8c4298d-00f5-46f7-91ba-f503fd581590}</Project>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="version.h.template" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

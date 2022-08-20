@@ -31,9 +31,11 @@
 #include "../foobar2000/SDK/foobar2000.h"
 #include "../columns_ui-sdk/ui_extension.h"
 
+#include "version.h"
+
 /** Declare some component information */
-DECLARE_COMPONENT_VERSION("Console panel", "3.0.0-beta.1",
-    "compiled: " __DATE__ "\n"
+DECLARE_COMPONENT_VERSION("Console panel", console_panel::version,
+    "compiled: " COMPILATION_DATE "\n"
     "with Panel API version: " UI_EXTENSION_VERSION
 
 );

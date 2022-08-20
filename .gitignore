@@ -190,3 +190,6 @@ debug-*/
 doxygen/
 .idea/
 vcpkg_installed/
+component-packages/
+
+/foo_uie_console/version.h
