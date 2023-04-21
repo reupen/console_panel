@@ -517,69 +517,75 @@ LRESULT ConsoleWindow::on_hook(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
         break;
     case WM_GETDLGCODE:
         break;
-    case WM_CONTEXTMENU:
-        if (wnd == reinterpret_cast<HWND>(wp)) {
-            enum {
-                ID_COPY = 1,
-                ID_CLEAR,
-                ID_EDGE_STYLE_NONE,
-                ID_EDGE_STYLE_SUNKEN,
-                ID_EDGE_STYLE_GREY,
-                ID_HIDE_TRAILING_NEWLINE
-            };
+    case WM_CONTEXTMENU: {
+        if (wnd != reinterpret_cast<HWND>(wp))
+            break;
 
-            POINT pt = {GET_X_LPARAM(lp), GET_Y_LPARAM(lp)};
-            if (pt.x == -1 && pt.y == -1) {
-                RECT rc;
-                GetRelativeRect(wnd, HWND_DESKTOP, &rc);
-                pt.x = rc.left + (rc.right - rc.left) / 2;
-                pt.y = rc.top + (rc.bottom - rc.top) / 2;
-            }
+        POINT pt = {GET_X_LPARAM(lp), GET_Y_LPARAM(lp)};
+        const auto from_keyboard = pt.x == -1 && pt.y == -1;
 
-            uih::Menu menu;
+        if (!from_keyboard && SendMessage(m_wnd_edit, WM_NCHITTEST, 0, lp) != HTCLIENT)
+            break;
 
-            menu.append_command(L"&Copy", ID_COPY);
-            menu.append_separator();
-            menu.append_command(L"&Clear", ID_CLEAR);
-            menu.append_separator();
+        enum {
+            ID_COPY = 1,
+            ID_CLEAR,
+            ID_EDGE_STYLE_NONE,
+            ID_EDGE_STYLE_SUNKEN,
+            ID_EDGE_STYLE_GREY,
+            ID_HIDE_TRAILING_NEWLINE
+        };
 
-            uih::Menu edge_style_submenu;
-            edge_style_submenu.append_command(
-                L"&None", ID_EDGE_STYLE_NONE, m_edge_style == EdgeStyle::None ? uih::Menu::flag_radiochecked : 0);
-            edge_style_submenu.append_command(
-                L"&Sunken", ID_EDGE_STYLE_SUNKEN, m_edge_style == EdgeStyle::Sunken ? uih::Menu::flag_radiochecked : 0);
-            edge_style_submenu.append_command(
-                L"&Grey", ID_EDGE_STYLE_GREY, m_edge_style == EdgeStyle::Grey ? uih::Menu::flag_radiochecked : 0);
-
-            menu.append_submenu(L"&Edge style", edge_style_submenu.detach());
-            menu.append_command(L"&Hide trailing newline", ID_HIDE_TRAILING_NEWLINE,
-                m_hide_trailing_newline ? uih::Menu::flag_checked : 0);
-
-            const auto cmd = menu.run(wnd, pt);
-
-            switch (cmd) {
-            case ID_COPY:
-                copy();
-                break;
-            case ID_CLEAR:
-                s_clear();
-                break;
-            case ID_EDGE_STYLE_NONE:
-                set_edge_style(EdgeStyle::None);
-                break;
-            case ID_EDGE_STYLE_SUNKEN:
-                set_edge_style(EdgeStyle::Sunken);
-                break;
-            case ID_EDGE_STYLE_GREY:
-                set_edge_style(EdgeStyle::Grey);
-                break;
-            case ID_HIDE_TRAILING_NEWLINE:
-                set_hide_trailing_newline(!m_hide_trailing_newline);
-                break;
-            }
-            return 0;
+        if (from_keyboard) {
+            RECT rc;
+            GetRelativeRect(wnd, HWND_DESKTOP, &rc);
+            pt.x = rc.left + (rc.right - rc.left) / 2;
+            pt.y = rc.top + (rc.bottom - rc.top) / 2;
         }
-        break;
+
+        uih::Menu menu;
+
+        menu.append_command(L"&Copy", ID_COPY);
+        menu.append_separator();
+        menu.append_command(L"&Clear", ID_CLEAR);
+        menu.append_separator();
+
+        uih::Menu edge_style_submenu;
+        edge_style_submenu.append_command(
+            L"&None", ID_EDGE_STYLE_NONE, m_edge_style == EdgeStyle::None ? uih::Menu::flag_radiochecked : 0);
+        edge_style_submenu.append_command(
+            L"&Sunken", ID_EDGE_STYLE_SUNKEN, m_edge_style == EdgeStyle::Sunken ? uih::Menu::flag_radiochecked : 0);
+        edge_style_submenu.append_command(
+            L"&Grey", ID_EDGE_STYLE_GREY, m_edge_style == EdgeStyle::Grey ? uih::Menu::flag_radiochecked : 0);
+
+        menu.append_submenu(L"&Edge style", edge_style_submenu.detach());
+        menu.append_command(
+            L"&Hide trailing newline", ID_HIDE_TRAILING_NEWLINE, m_hide_trailing_newline ? uih::Menu::flag_checked : 0);
+
+        const auto cmd = menu.run(wnd, pt);
+
+        switch (cmd) {
+        case ID_COPY:
+            copy();
+            break;
+        case ID_CLEAR:
+            s_clear();
+            break;
+        case ID_EDGE_STYLE_NONE:
+            set_edge_style(EdgeStyle::None);
+            break;
+        case ID_EDGE_STYLE_SUNKEN:
+            set_edge_style(EdgeStyle::Sunken);
+            break;
+        case ID_EDGE_STYLE_GREY:
+            set_edge_style(EdgeStyle::Grey);
+            break;
+        case ID_HIDE_TRAILING_NEWLINE:
+            set_hide_trailing_newline(!m_hide_trailing_newline);
+            break;
+        }
+        return 0;
+    }
     }
     return CallWindowProc(m_editproc, wnd, msg, wp, lp);
 }
