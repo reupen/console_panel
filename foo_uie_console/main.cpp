@@ -434,7 +434,8 @@ LRESULT ConsoleWindow::on_message(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
 
             SendMessage(wnd, MSG_UPDATE, 0, 0);
         }
-    } break;
+        break;
+    }
     case WM_TIMER:
         if (wp == ID_TIMER) {
             KillTimer(wnd, ID_TIMER);
@@ -463,6 +464,8 @@ LRESULT ConsoleWindow::on_message(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
     }
     case WM_ERASEBKGND:
         return FALSE;
+    case WM_CLOSE:
+        return 0;
     case WM_DESTROY:
         m_wnd_edit = nullptr;
         s_windows.erase(std::remove(s_windows.begin(), s_windows.end(), this), s_windows.end());
