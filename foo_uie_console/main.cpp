@@ -335,9 +335,10 @@ private:
 void ConsoleWindow::get_menu_items(uie::menu_hook_t& p_hook)
 {
     p_hook.add_node(new EdgeStyleMenuNode(this));
-    p_hook.add_node(new uie::simple_command_menu_node("Hide trailing newline",
-        "Toggles visibility of the trailing newline.", get_hide_trailing_newline() ? uih::Menu::flag_checked : 0,
-        [this, self = ptr{this}] { set_hide_trailing_newline(!get_hide_trailing_newline()); }));
+    p_hook.add_node(
+        new uie::simple_command_menu_node("Hide trailing newline", "Toggles visibility of the trailing newline.",
+            get_hide_trailing_newline() ? uie::menu_node_t::state_checked : 0,
+            [this, self = ptr{this}] { set_hide_trailing_newline(!get_hide_trailing_newline()); }));
 }
 
 long ConsoleWindow::get_edit_ex_styles() const
@@ -548,22 +549,24 @@ LRESULT ConsoleWindow::on_hook(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
 
         uih::Menu menu;
 
-        menu.append_command(L"&Copy", ID_COPY);
+        menu.append_command(ID_COPY, L"Copy");
         menu.append_separator();
-        menu.append_command(L"&Clear", ID_CLEAR);
+        menu.append_command(ID_CLEAR, L"Clear");
         menu.append_separator();
 
         uih::Menu edge_style_submenu;
         edge_style_submenu.append_command(
-            L"&None", ID_EDGE_STYLE_NONE, m_edge_style == EdgeStyle::None ? uih::Menu::flag_radiochecked : 0);
+            ID_EDGE_STYLE_NONE, L"None", {.is_radio_checked = m_edge_style == EdgeStyle::None});
         edge_style_submenu.append_command(
-            L"&Sunken", ID_EDGE_STYLE_SUNKEN, m_edge_style == EdgeStyle::Sunken ? uih::Menu::flag_radiochecked : 0);
+            ID_EDGE_STYLE_SUNKEN, L"Sunken", {.is_radio_checked = m_edge_style == EdgeStyle::Sunken});
         edge_style_submenu.append_command(
-            L"&Grey", ID_EDGE_STYLE_GREY, m_edge_style == EdgeStyle::Grey ? uih::Menu::flag_radiochecked : 0);
+            ID_EDGE_STYLE_GREY, L"Grey", {.is_radio_checked = m_edge_style == EdgeStyle::Grey});
 
-        menu.append_submenu(L"&Edge style", edge_style_submenu.detach());
+        menu.append_submenu(std::move(edge_style_submenu), L"Edge style");
         menu.append_command(
-            L"&Hide trailing newline", ID_HIDE_TRAILING_NEWLINE, m_hide_trailing_newline ? uih::Menu::flag_checked : 0);
+            ID_HIDE_TRAILING_NEWLINE, L"Hide trailing newline", {.is_checked = m_hide_trailing_newline});
+
+        menu_helpers::win32_auto_mnemonics(menu.get());
 
         const auto cmd = menu.run(wnd, pt);
 
