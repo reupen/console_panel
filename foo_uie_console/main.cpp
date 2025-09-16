@@ -48,13 +48,7 @@ constexpr auto current_config_version = 0;
 
 void ConsoleWindow::s_update_all_fonts()
 {
-    if (s_font) {
-        for (auto&& window : s_windows) {
-            if (const HWND wnd = window->m_wnd_edit)
-                SetWindowFont(wnd, nullptr, FALSE);
-        }
-    }
-
+    const auto old_font = std::move(s_font);
     s_font.reset(cui::fonts::helper(console_font_id).get_font());
 
     for (auto&& window : s_windows) {
