@@ -133,7 +133,7 @@ void ConsoleWindow::s_on_message_received(std::string_view text)
 
     fixed_text.resize(trim_pos + 1);
 
-    s_messages.emplace_back(fixed_text);
+    s_messages.emplace_back(mmh::to_utf16(fixed_text));
 
     if (s_messages.size() == maximum_messages)
         s_messages.pop_front();
@@ -259,20 +259,23 @@ long ConsoleWindow::get_edit_ex_styles() const
 
 void ConsoleWindow::update_content()
 {
+    const std::locale locale("");
+    const auto current_zone = std::chrono::current_zone();
+
     std::scoped_lock _(s_mutex);
-    std::string buffer;
+    std::wstring buffer;
     buffer.reserve(1024);
 
     for (auto iter = s_messages.begin(); iter != s_messages.end(); ++iter) {
-        std::format_to(std::back_inserter(buffer), "[{:%H:%M:%S}] {}",
-            std::chrono::time_point_cast<std::chrono::seconds>(iter->m_timestamp), iter->m_message);
+        const auto local_time = current_zone->to_local(iter->m_timestamp);
+        fmt::format_to(std::back_inserter(buffer), locale, L"[{:L%X}] {}", local_time, iter->m_message);
 
         if (!m_hide_trailing_newline || std::next(iter) != s_messages.end()) {
-            std::format_to(std::back_inserter(buffer), "\r\n");
+            fmt::format_to(std::back_inserter(buffer), L"\r\n");
         }
     }
 
-    uSetWindowText(m_wnd_edit, buffer.c_str());
+    SetWindowText(m_wnd_edit, buffer.c_str());
     const int len = Edit_GetLineCount(m_wnd_edit);
     Edit_Scroll(m_wnd_edit, len, 0);
     m_last_update_time_point = std::chrono::steady_clock::now();

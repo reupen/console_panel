@@ -5,8 +5,11 @@
 #include <algorithm>
 #include <chrono>
 #include <deque>
+#include <locale>
 #include <mutex>
 #include <vector>
+
+#include <fmt/xchar.h>
 
 #include "../ui_helpers/stdafx.h"
 
@@ -39,9 +42,9 @@ enum class EdgeStyle : int {
 class Message {
 public:
     std::chrono::system_clock::time_point m_timestamp;
-    std::string m_message;
+    std::wstring m_message;
 
-    Message(std::string message) : m_timestamp(std::chrono::system_clock::now()), m_message(std::move(message)) {}
+    Message(std::wstring message) : m_timestamp(std::chrono::system_clock::now()), m_message(std::move(message)) {}
 };
 
 class ConsoleWindow : public uie::container_uie_window_v3 {

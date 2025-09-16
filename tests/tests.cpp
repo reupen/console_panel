@@ -20,14 +20,14 @@ auto normalise_message(std::string_view text) {
 }
 
 TEST_CASE("normalises message line endings") {
-  CHECK(normalise_message("Test"sv) == "Test"sv);
-  CHECK(normalise_message("Test\r"sv) == "Test"sv);
-  CHECK(normalise_message("Test\n"sv) == "Test"sv);
-  CHECK(normalise_message("Test\r\n"sv) == "Test"sv);
-  CHECK(normalise_message("Test\rTest"sv) == "TestTest"sv);
-  CHECK(normalise_message("Test\nTest"sv) == "Test\r\nTest"sv);
-  CHECK(normalise_message("Test\r\nTest"sv) == "Test\r\nTest"sv);
-  CHECK(normalise_message("Test\r\rTest"sv) == "TestTest"sv);
-  CHECK(normalise_message("Test\n\nTest"sv) == "Test\r\n\r\nTest"sv);
-  CHECK(normalise_message("Test\r\n\r\nTest"sv) == "Test\r\n\r\nTest"sv);
+  CHECK(normalise_message("Test"sv) == L"Test"sv);
+  CHECK(normalise_message("Test\r"sv) == L"Test"sv);
+  CHECK(normalise_message("Test\n"sv) == L"Test"sv);
+  CHECK(normalise_message("Test\r\n"sv) == L"Test"sv);
+  CHECK(normalise_message("Test\rTest"sv) == L"TestTest"sv);
+  CHECK(normalise_message("Test\nTest"sv) == L"Test\r\nTest"sv);
+  CHECK(normalise_message("Test\r\nTest"sv) == L"Test\r\nTest"sv);
+  CHECK(normalise_message("Test\r\rTest"sv) == L"TestTest"sv);
+  CHECK(normalise_message("Test\n\nTest"sv) == L"Test\r\n\r\nTest"sv);
+  CHECK(normalise_message("Test\r\n\r\nTest"sv) == L"Test\r\n\r\nTest"sv);
 }
