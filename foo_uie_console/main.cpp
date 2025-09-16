@@ -3,35 +3,21 @@
  *
  * \brief Console panel component
  *
- * This component is an example of a multiple instance panel that takes keyboard input
+ * This component is an example of a multiple instance panel that takes
+ * keyboard input
  *
  * It demonstrates the following relevant techniques:
- * - Subclassing the child control to process keyboard shortcuts
+ * - Subclassing the child control (using a helper function from another
+ *   library) to process keyboard shortcuts
  * - Setting the font and colours of the child window
- * - Keeping a list of active windows and updating them from a callback (in this case designed
- *   such that the callback may come from any thread)
- * - That's about it ?
+ * - Keeping a list of active windows and updating them from a callback
+ *   (in this case designed such that the callback may come from any thread)
  */
 
-#define NOMINMAX
+#include "main.h"
 
-#include <algorithm>
-#include <deque>
-#include <mutex>
-#include <vector>
-
-#include "../ui_helpers/stdafx.h"
-
-#include "../pfc/pfc.h"
-
-#include <windows.h>
-#include <commctrl.h>
-#include <windowsx.h>
-
-#include "../foobar2000/SDK/foobar2000.h"
-#include "../columns_ui-sdk/ui_extension.h"
-
-#include "version.h"
+using namespace std::string_view_literals;
+using namespace std::chrono_literals;
 
 /** Declare some component information */
 DECLARE_COMPONENT_VERSION("Console panel", console_panel::version,
@@ -47,12 +33,6 @@ constexpr auto ID_TIMER = 667;
 /** \brief The maximum number of message we cache/display */
 constexpr t_size maximum_messages = 200;
 
-enum class EdgeStyle : int {
-    None = 0,
-    Sunken = 1,
-    Grey = 2,
-};
-
 cfg_int cfg_last_edge_style(GUID{0x05550547, 0xbf98, 0x088c, 0xbe, 0x0e, 0x24, 0x95, 0xe4, 0x9b, 0x88, 0xc7},
     static_cast<int>(EdgeStyle::None));
 
@@ -64,101 +44,22 @@ constexpr GUID console_font_id = {0x26059feb, 0x488b, 0x4ce1, {0x82, 0x4e, 0x4d,
 constexpr GUID console_colours_client_id
     = {0x9d814898, 0x0db4, 0x4591, {0xa7, 0xaa, 0x4e, 0x94, 0xdd, 0x07, 0xb3, 0x87}};
 
-/**
- * This is the unique GUID identifying our panel. You should not re-use this one
- * and generate your own using GUIDGEN.
- */
-constexpr GUID window_id{0x3c85d0a9, 0x19d5, 0x4144, {0xbc, 0xc2, 0x94, 0x9a, 0xb7, 0x64, 0x23, 0x3a}};
 constexpr auto current_config_version = 0;
-
-class Message {
-public:
-    SYSTEMTIME m_time{};
-    std::string m_message;
-
-    Message(std::string_view message) : m_message(message) { GetLocalTime(&m_time); }
-};
-
-class ConsoleWindow : public uie::container_uie_window_v3 {
-public:
-    static void s_update_all_fonts();
-    static void s_update_colours();
-    static void s_update_window_themes();
-    static void s_on_message_received(const char* ptr, t_size len); // from any thread
-
-    const GUID& get_extension_guid() const override { return window_id; }
-    void get_name(pfc::string_base& out) const override { out.set_string("Console"); }
-    void get_category(pfc::string_base& out) const override { out.set_string("Panels"); }
-
-    unsigned get_type() const override
-    {
-        /** In this case we are only of type type_panel */
-        return ui_extension::type_panel;
-    }
-
-    uie::container_window_v3_config get_window_config() override { return {L"{89A3759F-348A-4e3f-BF43-3D16BC059186}"}; }
-
-    void get_config(stream_writer* writer, abort_callback& abort) const override;
-    void set_config(stream_reader* reader, t_size p_size, abort_callback& abort) override;
-
-    void get_menu_items(uie::menu_hook_t& p_hook) override;
-
-    long get_edit_ex_styles() const;
-    void update_content();
-    void update_content_throttled();
-    EdgeStyle get_edge_style() const { return m_edge_style; }
-    void set_edge_style(EdgeStyle edge_style);
-    bool get_hide_trailing_newline() const { return m_hide_trailing_newline; }
-    void set_hide_trailing_newline(bool hide_trailing_newline);
-
-private:
-    static LRESULT WINAPI hook_proc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp);
-    static void s_clear();
-
-    LRESULT on_message(HWND wnd, UINT msg, WPARAM wp, LPARAM lp) override;
-    LRESULT on_hook(HWND wnd, UINT msg, WPARAM wp, LPARAM lp);
-    void set_window_theme() const;
-    void copy() const;
-
-    static std::mutex s_mutex;
-    static HFONT s_font;
-    static wil::unique_hbrush s_background_brush;
-    static std::deque<Message> s_messages;
-    static std::vector<HWND> s_notify_list;
-    static std::vector<service_ptr_t<ConsoleWindow>> s_windows;
-
-    HWND m_wnd_edit{};
-    WNDPROC m_editproc{};
-    LARGE_INTEGER m_time_last_update{};
-    bool m_timer_active{};
-    EdgeStyle m_edge_style{cfg_last_edge_style.get_value()};
-    bool m_hide_trailing_newline{cfg_last_hide_trailing_newline.get_value()};
-};
-
-std::vector<HWND> ConsoleWindow::s_notify_list;
-std::vector<service_ptr_t<ConsoleWindow>> ConsoleWindow::s_windows;
-HFONT ConsoleWindow::s_font{};
-wil::unique_hbrush ConsoleWindow::s_background_brush;
-std::deque<Message> ConsoleWindow::s_messages;
-std::mutex ConsoleWindow::s_mutex;
 
 void ConsoleWindow::s_update_all_fonts()
 {
-    if (s_font != nullptr) {
+    if (s_font) {
         for (auto&& window : s_windows) {
-            const HWND wnd = window->m_wnd_edit;
-            if (wnd)
+            if (const HWND wnd = window->m_wnd_edit)
                 SetWindowFont(wnd, nullptr, FALSE);
         }
-        DeleteObject(s_font);
     }
 
-    s_font = cui::fonts::helper(console_font_id).get_font();
+    s_font.reset(cui::fonts::helper(console_font_id).get_font());
 
     for (auto&& window : s_windows) {
-        const HWND wnd = window->m_wnd_edit;
-        if (wnd) {
-            SetWindowFont(wnd, s_font, TRUE);
+        if (const HWND wnd = window->m_wnd_edit) {
+            SetWindowFont(wnd, s_font.get(), TRUE);
         }
     }
 }
@@ -202,34 +103,44 @@ void ConsoleWindow::set_hide_trailing_newline(bool hide_trailing_newline)
     update_content_throttled();
 }
 
-void ConsoleWindow::s_on_message_received(const char* ptr, t_size len)
+void ConsoleWindow::s_on_message_received(std::string_view text)
 {
-    std::scoped_lock<std::mutex> _(s_mutex);
+    std::scoped_lock _(s_mutex);
 
-    pfc::string8 buffer;
-    /**  Sort out line break messes */
-    {
-        const char* start = ptr;
-        const char* pos = ptr;
-        while (t_size(pos - ptr) < len && *pos) {
-            while (t_size(pos - ptr + 1) < len && pos[1] && pos[0] != '\n')
-                pos++;
-            {
-                if (pos[0] == '\n')
-                    buffer.add_string(start, pos - start - ((pos > ptr && (pos[-1]) == '\r') ? 1 : 0));
-                else
-                    buffer.add_string(start, pos + 1 - start);
-                buffer.add_byte('\r');
-                buffer.add_byte('\n');
-                // if ((pos-ptr)<len && *pos)
-                {
-                    start = pos + 1;
-                    pos++;
-                }
-            }
+    size_t offset{};
+    std::string fixed_text;
+
+    while (true) {
+        const size_t index = text.find_first_of("\r\n"sv, offset);
+
+        const auto fragment_length = index == std::string_view::npos ? std::string_view::npos : index - offset;
+        const auto fragment = text.substr(offset, fragment_length);
+
+        fixed_text.append(fragment);
+
+        if (index == std::string_view::npos)
+            break;
+
+        offset = text.find_first_not_of('\r', index);
+
+        if (offset == std::string_view::npos)
+            break;
+
+        if (text[offset] == '\n') {
+            fixed_text.append("\r\n"sv);
+            ++offset;
         }
     }
-    s_messages.emplace_back(Message({buffer.get_ptr(), buffer.get_length()}));
+
+    const auto trim_pos = fixed_text.find_last_not_of("\r\n"sv);
+
+    if (trim_pos == std::string::npos)
+        return;
+
+    fixed_text.resize(trim_pos + 1);
+
+    s_messages.emplace_back(fixed_text);
+
     if (s_messages.size() == maximum_messages)
         s_messages.pop_front();
 
@@ -257,7 +168,7 @@ void ConsoleWindow::copy() const
 
 void ConsoleWindow::s_clear()
 {
-    std::scoped_lock<std::mutex> _(s_mutex);
+    std::scoped_lock _(s_mutex);
 
     /** Clear all messages */
     s_messages.clear();
@@ -354,38 +265,37 @@ long ConsoleWindow::get_edit_ex_styles() const
 
 void ConsoleWindow::update_content()
 {
-    std::scoped_lock<std::mutex> _(s_mutex);
-    pfc::string8_fastalloc buffer;
-    buffer.prealloc(1024);
+    std::scoped_lock _(s_mutex);
+    std::string buffer;
+    buffer.reserve(1024);
 
-    for (auto&& message : s_messages) {
-        buffer << "[" << pfc::format_int(message.m_time.wHour, 2) << ":" << pfc::format_int(message.m_time.wMinute, 2)
-               << ":" << pfc::format_int(message.m_time.wSecond, 2) << "] " << message.m_message.c_str();
+    for (auto iter = s_messages.begin(); iter != s_messages.end(); ++iter) {
+        std::format_to(std::back_inserter(buffer), "[{:%H:%M:%S}] {}",
+            std::chrono::time_point_cast<std::chrono::seconds>(iter->m_timestamp), iter->m_message);
+
+        if (!m_hide_trailing_newline || std::next(iter) != s_messages.end()) {
+            std::format_to(std::back_inserter(buffer), "\r\n");
+        }
     }
 
-    if (m_hide_trailing_newline && !buffer.is_empty())
-        buffer.truncate(std::string_view(buffer.c_str()).find_last_not_of("\r\n") + 1);
-
-    uSetWindowText(m_wnd_edit, buffer);
+    uSetWindowText(m_wnd_edit, buffer.c_str());
     const int len = Edit_GetLineCount(m_wnd_edit);
     Edit_Scroll(m_wnd_edit, len, 0);
-    QueryPerformanceCounter(&m_time_last_update);
+    m_last_update_time_point = std::chrono::steady_clock::now();
 }
 
-void ConsoleWindow::update_content_throttled()
+void ConsoleWindow::update_content_throttled() noexcept
 {
     if (m_timer_active)
         return;
 
-    LARGE_INTEGER current = {0}, freq = {0};
-    QueryPerformanceCounter(&current);
-    QueryPerformanceFrequency(&freq);
-    t_uint64 tenth = 5;
-    if (m_time_last_update.QuadPart) {
-        tenth = (current.QuadPart - m_time_last_update.QuadPart) / (freq.QuadPart / 100);
-    }
-    if (tenth < 25) {
-        SetTimer(get_wnd(), ID_TIMER, 250 - t_uint32(tenth) * 10, nullptr);
+    const auto now = std::chrono::steady_clock::now();
+    const auto time_since_last_update = now - m_last_update_time_point;
+
+    if (time_since_last_update < 250ms) {
+        const auto ms_since_last_update
+            = std::chrono::duration_cast<std::chrono::milliseconds>((now - m_last_update_time_point)).count();
+        SetTimer(get_wnd(), ID_TIMER, 250 - gsl::narrow<uint32_t>(ms_since_last_update), nullptr);
         m_timer_active = true;
     } else
         update_content();
@@ -401,7 +311,7 @@ LRESULT ConsoleWindow::on_message(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
          */
         s_windows.emplace_back(this);
         {
-            std::scoped_lock<std::mutex> _(s_mutex);
+            std::scoped_lock _(s_mutex);
             /** Store a window handle in this list, used in global notifications (in any thread) which
              * updates the panels */
             s_notify_list.emplace_back(wnd);
@@ -418,20 +328,19 @@ LRESULT ConsoleWindow::on_message(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
             set_window_theme();
 
             if (s_font) {
-                /** Nth, n>1, instance; use exisiting font handle */
-                SetWindowFont(m_wnd_edit, s_font, FALSE);
-            } else
+                SetWindowFont(m_wnd_edit, s_font.get(), FALSE);
+            } else {
                 /** First window - create the font handle */
                 s_update_all_fonts();
+            }
 
             if (!s_background_brush)
                 s_update_colours();
 
-            /** Store a pointer to ourself in the user data field of the edit window */
-            SetWindowLongPtr(m_wnd_edit, GWLP_USERDATA, reinterpret_cast<LPARAM>(this));
-            /** Subclass the edit window */
-            m_editproc = reinterpret_cast<WNDPROC>(
-                SetWindowLongPtr(m_wnd_edit, GWLP_WNDPROC, reinterpret_cast<LPARAM>(hook_proc)));
+            uih::subclass_window(
+                m_wnd_edit, [this](auto wnd_proc, auto wnd, auto msg, auto wp, auto lp) -> std::optional<LRESULT> {
+                    return handle_edit_message(wnd_proc, wnd, msg, wp, lp);
+                });
 
             SendMessage(wnd, MSG_UPDATE, 0, 0);
         }
@@ -469,17 +378,16 @@ LRESULT ConsoleWindow::on_message(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
         return 0;
     case WM_DESTROY:
         m_wnd_edit = nullptr;
-        s_windows.erase(std::remove(s_windows.begin(), s_windows.end(), this), s_windows.end());
+        std::erase(s_windows, this);
 
         {
-            std::scoped_lock<std::mutex> _(s_mutex);
-            s_notify_list.erase(std::remove(s_notify_list.begin(), s_notify_list.end(), wnd), s_notify_list.end());
+            std::scoped_lock _(s_mutex);
+            std::erase(s_notify_list, wnd);
         }
         break;
     case WM_NCDESTROY:
         if (s_windows.empty()) {
-            DeleteFont(s_font);
-            s_font = nullptr;
+            s_font.reset();
             s_background_brush.reset();
         }
         break;
@@ -487,20 +395,12 @@ LRESULT ConsoleWindow::on_message(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
     return DefWindowProc(wnd, msg, wp, lp);
 }
 
-LRESULT WINAPI ConsoleWindow::hook_proc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
+std::optional<LRESULT> ConsoleWindow::handle_edit_message(WNDPROC wnd_proc, HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
 {
-    auto* self = reinterpret_cast<ConsoleWindow*>(GetWindowLongPtr(wnd, GWLP_USERDATA));
-    return self ? self->on_hook(wnd, msg, wp, lp) : DefWindowProc(wnd, msg, wp, lp);
-}
+    if (const auto result = uih::handle_subclassed_window_buffered_painting(wnd_proc, wnd, msg, wp, lp))
+        return result;
 
-LRESULT ConsoleWindow::on_hook(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
-{
     switch (msg) {
-    case WM_ERASEBKGND:
-        return FALSE;
-    case WM_PAINT:
-        uih::paint_subclassed_window_with_buffering(wnd, m_editproc);
-        return 0;
     case WM_KEYDOWN:
         /**
          * It's possible to assign right, left, up and down keys to keyboard shortcuts. But we would rather
@@ -519,8 +419,6 @@ LRESULT ConsoleWindow::on_hook(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
         if (get_host()->get_keyboard_shortcuts_enabled() && g_process_keydown_keyboard_shortcuts(wp))
             return 0;
         break;
-    case WM_GETDLGCODE:
-        break;
     case WM_CONTEXTMENU: {
         if (wnd != reinterpret_cast<HWND>(wp))
             break;
@@ -531,15 +429,6 @@ LRESULT ConsoleWindow::on_hook(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
         if (!from_keyboard && SendMessage(m_wnd_edit, WM_NCHITTEST, 0, lp) != HTCLIENT)
             break;
 
-        enum {
-            ID_COPY = 1,
-            ID_CLEAR,
-            ID_EDGE_STYLE_NONE,
-            ID_EDGE_STYLE_SUNKEN,
-            ID_EDGE_STYLE_GREY,
-            ID_HIDE_TRAILING_NEWLINE
-        };
-
         if (from_keyboard) {
             RECT rc;
             GetRelativeRect(wnd, HWND_DESKTOP, &rc);
@@ -547,53 +436,36 @@ LRESULT ConsoleWindow::on_hook(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
             pt.y = rc.top + (rc.bottom - rc.top) / 2;
         }
 
-        uih::Menu menu;
+        const uih::Menu menu;
+        uih::MenuCommandCollector command_collector;
 
-        menu.append_command(ID_COPY, L"Copy");
+        menu.append_command(command_collector.add([this] { copy(); }), L"Copy");
         menu.append_separator();
-        menu.append_command(ID_CLEAR, L"Clear");
+        menu.append_command(command_collector.add([] { s_clear(); }), L"Clear");
         menu.append_separator();
 
         uih::Menu edge_style_submenu;
-        edge_style_submenu.append_command(
-            ID_EDGE_STYLE_NONE, L"None", {.is_radio_checked = m_edge_style == EdgeStyle::None});
-        edge_style_submenu.append_command(
-            ID_EDGE_STYLE_SUNKEN, L"Sunken", {.is_radio_checked = m_edge_style == EdgeStyle::Sunken});
-        edge_style_submenu.append_command(
-            ID_EDGE_STYLE_GREY, L"Grey", {.is_radio_checked = m_edge_style == EdgeStyle::Grey});
+        edge_style_submenu.append_command(command_collector.add([this] { set_edge_style(EdgeStyle::None); }), L"None",
+            {.is_radio_checked = m_edge_style == EdgeStyle::None});
+        edge_style_submenu.append_command(command_collector.add([this] { set_edge_style(EdgeStyle::Sunken); }),
+            L"Sunken", {.is_radio_checked = m_edge_style == EdgeStyle::Sunken});
+        edge_style_submenu.append_command(command_collector.add([this] { set_edge_style(EdgeStyle::Grey); }), L"Grey",
+            {.is_radio_checked = m_edge_style == EdgeStyle::Grey});
 
         menu.append_submenu(std::move(edge_style_submenu), L"Edge style");
-        menu.append_command(
-            ID_HIDE_TRAILING_NEWLINE, L"Hide trailing newline", {.is_checked = m_hide_trailing_newline});
+        menu.append_command(command_collector.add([this] { set_hide_trailing_newline(!m_hide_trailing_newline); }),
+            L"Hide trailing newline", {.is_checked = m_hide_trailing_newline});
 
         menu_helpers::win32_auto_mnemonics(menu.get());
 
         const auto cmd = menu.run(wnd, pt);
 
-        switch (cmd) {
-        case ID_COPY:
-            copy();
-            break;
-        case ID_CLEAR:
-            s_clear();
-            break;
-        case ID_EDGE_STYLE_NONE:
-            set_edge_style(EdgeStyle::None);
-            break;
-        case ID_EDGE_STYLE_SUNKEN:
-            set_edge_style(EdgeStyle::Sunken);
-            break;
-        case ID_EDGE_STYLE_GREY:
-            set_edge_style(EdgeStyle::Grey);
-            break;
-        case ID_HIDE_TRAILING_NEWLINE:
-            set_hide_trailing_newline(!m_hide_trailing_newline);
-            break;
-        }
+        command_collector.execute(cmd);
+
         return 0;
     }
     }
-    return CallWindowProc(m_editproc, wnd, msg, wp, lp);
+    return {};
 }
 
 void ConsoleWindow::set_window_theme() const
@@ -604,7 +476,7 @@ void ConsoleWindow::set_window_theme() const
     SetWindowTheme(m_wnd_edit, cui::colours::is_dark_mode_active() ? L"DarkMode_Explorer" : nullptr, nullptr);
 }
 
-static ui_extension::window_factory<ConsoleWindow> console_window_factory;
+static uie::window_factory<ConsoleWindow> console_window_factory;
 
 class ConsoleReceiver : public console_receiver {
     /**
@@ -618,7 +490,7 @@ class ConsoleReceiver : public console_receiver {
      */
     void print(const char* p_message, size_t p_message_length) override
     {
-        ConsoleWindow::s_on_message_received(p_message, p_message_length);
+        ConsoleWindow::s_on_message_received({p_message, strnlen_s(p_message, p_message_length)});
     }
 };
 

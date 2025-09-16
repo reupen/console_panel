@@ -1,24 +1,28 @@
 {
   "name": "console-panel",
   "version-string": "git",
-  "builtin-baseline": "6062c8fe02d38b10d5291411bc235ae4d02cfe6c",
-  "dependencies": ["fmt", "ms-gsl", "range-v3", "wil"],
+  "builtin-baseline": "dd3097e305afa53f7b4312371f62058d2e665320",
+  "dependencies": ["fmt", "ms-gsl", "range-v3", "wil", "doctest"],
   "overrides": [
     {
+      "name": "doctest",
+      "version": "2.4.12"
+    },
+    {
       "name": "fmt",
-      "version": "10.2.1#2"
+      "version": "11.2.0"
     },
     {
       "name": "ms-gsl",
-      "version": "4.0.0#1"
+      "version": "4.2.0"
     },
     {
       "name": "range-v3",
-      "version": "0.12.0#2"
+      "version": "0.12.0#4"
     },
     {
       "name": "wil",
-      "version": "2024-01-22"
+      "version": "1.0.250325.1"
     }
   ]
 }
