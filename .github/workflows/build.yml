@@ -8,6 +8,7 @@ on:
   push:
     branches:
       - main
+      - test/*
 
 jobs:
   build:
@@ -19,33 +20,12 @@ jobs:
         platform: ["win32", "x64"]
 
     steps:
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-          submodules: true
+      - uses: reupen/github-actions/.github/actions/prepare-msbuild-vcpkg@msbuild
+        name: Prepare MSBuild and vcpkg
 
-      - name: Set up MSBuild
-        uses: microsoft/setup-msbuild@v2
-
-      - name: Cache dependencies
-        uses: actions/cache@v4
-        with:
-          path: C:\Users\runneradmin\AppData\Local\vcpkg\archives
-          key: ${{ runner.os }}-vcpkg-archives-${{ hashFiles('vcpkg.json') }}
-
-      - name: Set up vcpkg
+      - name: Build component
         run: |
-          git -C C:\vcpkg fetch
-          vcpkg version
-          vcpkg integrate install
-
-      - name: Set up MSBuild logger
-        run: |
-          Invoke-WebRequest -Uri https://github.com/reupen/msbuild-github-logger/releases/download/v1.0.1/Reupen.MSBuild.GitHubLogger.dll -OutFile "$Env:Temp\Reupen.MSBuild.GitHubLogger.dll"
-
-      - name: Build
-        run: |
-          msbuild /m '/p:Platform=${{ matrix.platform }};Configuration=${{ matrix.configuration }}' "/logger:$Env:Temp\Reupen.MSBuild.GitHubLogger.dll" vc17\console_panel.sln
+          msbuild /m '/p:Platform=${{ matrix.platform }};Configuration=${{ matrix.configuration }}' /t:Rebuild "/logger:$Env:Temp\Reupen.MSBuild.GitHubLogger.dll" vc17\console_panel.sln
 
       - uses: actions/upload-artifact@v4
         if: matrix.configuration == 'release'
@@ -58,3 +38,23 @@ jobs:
         with:
           name: Symbols for debugging (${{ matrix.configuration }}, ${{ matrix.platform }})
           path: vc17\release-*\*.pdb
+
+  test:
+    runs-on: windows-2022
+
+    strategy:
+      matrix:
+        configuration: ["release"]
+        platform: ["win32", "x64"]
+
+    steps:
+      - uses: reupen/github-actions/.github/actions/prepare-msbuild-vcpkg@msbuild
+        name: Prepare MSBuild and vcpkg
+
+      - name: Build tests
+        run: |
+          msbuild /m '/p:Platform=${{ matrix.platform }};Configuration=${{ matrix.configuration }}-test' "/logger:$Env:Temp\Reupen.MSBuild.GitHubLogger.dll" vc17\console_panel.sln
+
+      - name: Run tests
+        run: |
+          Invoke-Expression '.\vc17\${{ matrix.configuration }}-${{ matrix.platform }}-v143\tests.exe'
