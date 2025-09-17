@@ -385,6 +385,8 @@ LRESULT ConsoleWindow::on_message(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
             if (!s_background_brush)
                 s_update_colours();
 
+            uih::enhance_edit_control(m_wnd_edit);
+            uih::subclass_window_and_paint_with_buffering(m_wnd_edit);
             uih::subclass_window(
                 m_wnd_edit, [this](auto wnd_proc, auto wnd, auto msg, auto wp, auto lp) -> std::optional<LRESULT> {
                     return handle_edit_message(wnd_proc, wnd, msg, wp, lp);
@@ -445,9 +447,6 @@ LRESULT ConsoleWindow::on_message(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
 
 std::optional<LRESULT> ConsoleWindow::handle_edit_message(WNDPROC wnd_proc, HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
 {
-    if (const auto result = uih::handle_subclassed_window_buffered_painting(wnd_proc, wnd, msg, wp, lp))
-        return result;
-
     switch (msg) {
     case WM_KEYDOWN:
         /**
