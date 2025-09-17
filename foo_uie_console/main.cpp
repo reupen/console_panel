@@ -33,11 +33,14 @@ constexpr auto ID_TIMER = 667;
 /** \brief The maximum number of message we cache/display */
 constexpr t_size maximum_messages = 200;
 
-cfg_int cfg_last_edge_style(GUID{0x05550547, 0xbf98, 0x088c, 0xbe, 0x0e, 0x24, 0x95, 0xe4, 0x9b, 0x88, 0xc7},
-    static_cast<int>(EdgeStyle::None));
+cfg_int cfg_last_edge_style(
+    GUID{0x05550547, 0xbf98, 0x088c, {0xbe, 0x0e, 0x24, 0x95, 0xe4, 0x9b, 0x88, 0xc7}}, WI_EnumValue(EdgeStyle::None));
+
+cfg_int cfg_last_timestamp_mode(GUID{0x83b57f5c, 0xa325, 0x49f5, {0x9f, 0x56, 0x0d, 0xab, 0xf0, 0xe8, 0x24, 0xa3}},
+    WI_EnumValue(TimestampMode::Time));
 
 cfg_bool cfg_last_hide_trailing_newline(
-    {0x5db0b4d6, 0xf429, 0x4fc5, 0xb9, 0x1d, 0x29, 0x8e, 0xf3, 0x34, 0x75, 0x16}, false);
+    {0x5db0b4d6, 0xf429, 0x4fc5, {0xb9, 0x1d, 0x29, 0x8e, 0xf3, 0x34, 0x75, 0x16}}, false);
 
 constexpr GUID console_font_id = {0x26059feb, 0x488b, 0x4ce1, {0x82, 0x4e, 0x4d, 0xf1, 0x13, 0xb4, 0x55, 0x8e}};
 
@@ -94,6 +97,13 @@ void ConsoleWindow::set_hide_trailing_newline(bool hide_trailing_newline)
 {
     cfg_last_hide_trailing_newline = m_hide_trailing_newline = hide_trailing_newline;
 
+    update_content_throttled();
+}
+
+void ConsoleWindow::set_timestamp_mode(TimestampMode mode)
+{
+    cfg_last_timestamp_mode = WI_EnumValue(mode);
+    m_timestamp_mode = mode;
     update_content_throttled();
 }
 
@@ -178,6 +188,7 @@ void ConsoleWindow::get_config(stream_writer* writer, abort_callback& abort) con
     writer->write_lendian_t(current_config_version, abort);
     writer->write_lendian_t(static_cast<int32_t>(m_edge_style), abort);
     writer->write_object_t(m_hide_trailing_newline, abort);
+    writer->write_lendian_t(static_cast<int32_t>(m_timestamp_mode), abort);
 }
 
 void ConsoleWindow::set_config(stream_reader* reader, t_size p_size, abort_callback& abort)
@@ -190,17 +201,51 @@ void ConsoleWindow::set_config(stream_reader* reader, t_size p_size, abort_callb
     }
 
     if (version <= current_config_version) {
-        int32_t edge_style{};
-        reader->read_lendian_t(edge_style, abort);
-        m_edge_style = EdgeStyle{edge_style};
+        m_edge_style = static_cast<EdgeStyle>(reader->read_lendian_t<int32_t>(abort));
 
-        // Gracefully handle the new 'hide trailing newline' config bits when updating the component
+        // Gracefully handle newer fields that won't have been written by old versions of the panel
         try {
-            reader->read_object_t(m_hide_trailing_newline, abort);
+            m_hide_trailing_newline = reader->read_object_t<bool>(abort);
+            m_timestamp_mode = static_cast<TimestampMode>(reader->read_lendian_t<int32_t>(abort));
         } catch (const exception_io_data_truncation&) {
         }
     }
 }
+
+class TimestampModeMenuNode : public uie::menu_node_popup_t {
+public:
+    TimestampModeMenuNode(service_ptr_t<ConsoleWindow> window)
+    {
+        const auto current_timestamp_mode = window->get_timestamp_mode();
+
+        m_nodes.emplace_back("None", "Do not show timestamps for each message",
+            current_timestamp_mode == TimestampMode::None ? state_radiochecked : 0,
+            [window] { window->set_timestamp_mode(TimestampMode::None); });
+
+        m_nodes.emplace_back("Time", "Show times for each message",
+            current_timestamp_mode == TimestampMode::Time ? state_radiochecked : 0,
+            [window] { window->set_timestamp_mode(TimestampMode::Time); });
+
+        m_nodes.emplace_back("Date and time", "Show dates and times for each message",
+            current_timestamp_mode == TimestampMode::DateAndTime ? state_radiochecked : 0,
+            [window] { window->set_timestamp_mode(TimestampMode::DateAndTime); });
+    }
+
+    t_size get_children_count() const override { return m_nodes.size(); }
+    void get_child(t_size index, uie::menu_node_ptr& p_out) const override
+    {
+        if (index < m_nodes.size())
+            p_out = new uie::simple_command_menu_node(m_nodes[index]);
+    }
+    bool get_display_data(pfc::string_base& p_out, unsigned& p_state) const override
+    {
+        p_out = "Timestamps";
+        return true;
+    }
+
+private:
+    std::vector<uie::simple_command_menu_node> m_nodes;
+};
 
 class EdgeStyleMenuNode : public uie::menu_node_popup_t {
 public:
@@ -239,6 +284,7 @@ private:
 
 void ConsoleWindow::get_menu_items(uie::menu_hook_t& p_hook)
 {
+    p_hook.add_node(new TimestampModeMenuNode(this));
     p_hook.add_node(new EdgeStyleMenuNode(this));
     p_hook.add_node(
         new uie::simple_command_menu_node("Hide trailing newline", "Toggles visibility of the trailing newline.",
@@ -268,11 +314,16 @@ void ConsoleWindow::update_content()
 
     for (auto iter = s_messages.begin(); iter != s_messages.end(); ++iter) {
         const auto local_time = current_zone->to_local(iter->m_timestamp);
-        fmt::format_to(std::back_inserter(buffer), locale, L"[{:L%X}] {}", local_time, iter->m_message);
 
-        if (!m_hide_trailing_newline || std::next(iter) != s_messages.end()) {
-            fmt::format_to(std::back_inserter(buffer), L"\r\n");
-        }
+        if (m_timestamp_mode == TimestampMode::DateAndTime)
+            fmt::format_to(std::back_inserter(buffer), locale, L"[{:L%c}] {}", local_time, iter->m_message);
+        else if (m_timestamp_mode == TimestampMode::Time)
+            fmt::format_to(std::back_inserter(buffer), locale, L"[{:L%X}] {}", local_time, iter->m_message);
+        else
+            buffer.append(iter->m_message);
+
+        if (!m_hide_trailing_newline || std::next(iter) != s_messages.end())
+            buffer.append(L"\r\n"sv);
     }
 
     SetWindowText(m_wnd_edit, buffer.c_str());
@@ -440,6 +491,18 @@ std::optional<LRESULT> ConsoleWindow::handle_edit_message(WNDPROC wnd_proc, HWND
         menu.append_separator();
         menu.append_command(command_collector.add([] { s_clear(); }), L"Clear");
         menu.append_separator();
+
+        uih::Menu timestamp_mode_submenu;
+        timestamp_mode_submenu.append_command(
+            command_collector.add([this] { set_timestamp_mode(TimestampMode::None); }), L"None",
+            {.is_radio_checked = m_timestamp_mode == TimestampMode::None});
+        timestamp_mode_submenu.append_command(
+            command_collector.add([this] { set_timestamp_mode(TimestampMode::Time); }), L"Time",
+            {.is_radio_checked = m_timestamp_mode == TimestampMode::Time});
+        timestamp_mode_submenu.append_command(
+            command_collector.add([this] { set_timestamp_mode(TimestampMode::DateAndTime); }), L"Date and time",
+            {.is_radio_checked = m_timestamp_mode == TimestampMode::DateAndTime});
+        menu.append_submenu(std::move(timestamp_mode_submenu), L"Timestamps");
 
         uih::Menu edge_style_submenu;
         edge_style_submenu.append_command(command_collector.add([this] { set_edge_style(EdgeStyle::None); }), L"None",

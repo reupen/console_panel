@@ -31,12 +31,19 @@
 constexpr GUID window_id{0x3c85d0a9, 0x19d5, 0x4144, {0xbc, 0xc2, 0x94, 0x9a, 0xb7, 0x64, 0x23, 0x3a}};
 
 extern cfg_int cfg_last_edge_style;
+extern cfg_int cfg_last_timestamp_mode;
 extern cfg_bool cfg_last_hide_trailing_newline;
 
-enum class EdgeStyle : int {
+enum class EdgeStyle : int32_t {
     None = 0,
     Sunken = 1,
     Grey = 2,
+};
+
+enum class TimestampMode : int32_t {
+    None = 0,
+    Time = 1,
+    DateAndTime = 2,
 };
 
 class Message {
@@ -78,6 +85,8 @@ public:
     void set_edge_style(EdgeStyle edge_style);
     bool get_hide_trailing_newline() const { return m_hide_trailing_newline; }
     void set_hide_trailing_newline(bool hide_trailing_newline);
+    TimestampMode get_timestamp_mode() const { return m_timestamp_mode; }
+    void set_timestamp_mode(TimestampMode mode);
 
 protected:
     static void s_clear();
@@ -98,5 +107,6 @@ protected:
     std::chrono::steady_clock::time_point m_last_update_time_point;
     bool m_timer_active{};
     EdgeStyle m_edge_style{cfg_last_edge_style.get_value()};
+    TimestampMode m_timestamp_mode{cfg_last_timestamp_mode.get_value()};
     bool m_hide_trailing_newline{cfg_last_hide_trailing_newline.get_value()};
 };
