@@ -306,21 +306,26 @@ long ConsoleWindow::get_edit_ex_styles() const
 void ConsoleWindow::update_content()
 {
     const std::locale locale("");
-    const auto current_zone = std::chrono::current_zone();
 
     std::scoped_lock _(s_mutex);
     std::wstring buffer;
     buffer.reserve(1024);
 
-    for (auto iter = s_messages.begin(); iter != s_messages.end(); ++iter) {
-        const auto local_time = current_zone->to_local(iter->m_timestamp);
+    tm local_time{};
 
-        if (m_timestamp_mode == TimestampMode::DateAndTime)
-            fmt::format_to(std::back_inserter(buffer), locale, L"[{:L%c}] {}", local_time, iter->m_message);
-        else if (m_timestamp_mode == TimestampMode::Time)
-            fmt::format_to(std::back_inserter(buffer), locale, L"[{:L%X}] {}", local_time, iter->m_message);
-        else
+    if (m_timestamp_mode != TimestampMode::None)
+        _tzset();
+
+    for (auto iter = s_messages.begin(); iter != s_messages.end(); ++iter) {
+        const auto timestamp_time_t = std::chrono::system_clock::to_time_t(iter->m_timestamp);
+        const auto localtime_result = localtime_s(&local_time, &timestamp_time_t);
+
+        if (localtime_result != 0 || m_timestamp_mode == TimestampMode::None)
             buffer.append(iter->m_message);
+        else if (m_timestamp_mode == TimestampMode::DateAndTime)
+            fmt::format_to(std::back_inserter(buffer), locale, L"[{:L%c}] {}", local_time, iter->m_message);
+        else
+            fmt::format_to(std::back_inserter(buffer), locale, L"[{:L%X}] {}", local_time, iter->m_message);
 
         if (!m_hide_trailing_newline || std::next(iter) != s_messages.end())
             buffer.append(L"\r\n"sv);
