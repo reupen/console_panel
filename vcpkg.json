@@ -1,8 +1,15 @@
 {
   "name": "console-panel",
   "version-string": "git",
-  "builtin-baseline": "dd3097e305afa53f7b4312371f62058d2e665320",
-  "dependencies": ["fmt", "ms-gsl", "range-v3", "wil", "doctest"],
+  "builtin-baseline": "84bab45d415d22042bd0b9081aea57f362da3f35",
+  "dependencies": [
+    "fmt",
+    "foonathan-lexy",
+    "ms-gsl",
+    "range-v3",
+    "wil",
+    "doctest"
+  ],
   "overrides": [
     {
       "name": "doctest",
@@ -11,6 +18,10 @@
     {
       "name": "fmt",
       "version": "11.2.0"
+    },
+    {
+      "name": "foonathan-lexy",
+      "version": "2025.5.0"
     },
     {
       "name": "ms-gsl",
