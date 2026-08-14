@@ -488,7 +488,7 @@ std::optional<LRESULT> ConsoleWindow::handle_edit_message(WNDPROC wnd_proc, HWND
             pt.y = rc.top + (rc.bottom - rc.top) / 2;
         }
 
-        const uih::Menu menu;
+        uih::Menu menu;
         uih::MenuCommandCollector command_collector;
 
         menu.append_command(command_collector.add([this] { copy(); }), L"Copy");
